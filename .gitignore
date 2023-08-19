@@ -1,0 +1,15 @@
+node_modules
+.env
+coverage
+coverage.json
+typechain
+orderbook-venv
+data
+
+#Hardhat files
+cache
+artifacts
+
+typechain-types/**
+
+*_parsed.sol
