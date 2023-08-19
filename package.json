@@ -8,6 +8,7 @@
     "@ethersproject/bignumber": "^5.7.0",
     "@openzeppelin/contracts": "^4.8.2",
     "@types/chai-as-promised": "^7.1.5",
+    "@uniswap/v3-core": "^1.0.1",
     "chai-as-promised": "^7.1.1",
     "ethers": "^5.0.0",
     "hardhat": "^2.14.0",
@@ -39,7 +40,7 @@
   },
   "scripts": {
     "test_legacy": "./node_modules/.bin/mocha --full-trace --config ./test/mocharc.nightly.json",
-    "preprocess" : "npx ts-node scripts/preprocess_for_tests.ts",
+    "preprocess": "npx ts-node scripts/preprocess_for_tests.ts",
     "test": "TS_NODE_FILES=true && npm run preprocess && npx hardhat test"
   }
 }
