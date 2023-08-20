@@ -44,6 +44,7 @@ const TICK_SPACING = 2
 
 let TOKEN_0 : string
 let TOKEN_1 : string
+let WETH : string
 
 let token0Contract : any
 let token1Contract : any
@@ -215,9 +216,12 @@ describe('test BasePool', function () {
         token0Contract = await erc20Blueprint.deploy()
         TOKEN_0 = token0Contract.address
 
-
         token1Contract = await erc20Blueprint.deploy()
         TOKEN_1 = token1Contract.address
+
+        const weth9Blueprint = await hre.ethers.getContractFactory('WETH9')
+        const weth9Contract = await weth9Blueprint.deploy()
+        WETH = weth9Contract.address
 
         //await transpileContract('contracts/BasePool.solpp')
         //await transpileContract('contracts/Controller.solpp')
@@ -271,23 +275,18 @@ describe('test BasePool', function () {
 
             expect(contract.address).to.be.a('string')
 
-            // TODO: Replace with the actual WETH9 address
-            const weth9Address = ZERO_ADDRESS
-
-            routerContract = await routerBlueprint.deploy(factoryContract.address, weth9Address)
+            routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
             console.log('Deployed router.')
 
-            console.log(weth9Address)
-
             positionDescriptorContract = await positionDescriptorBlueprint.deploy(
-                weth9Address,
+                WETH,
                 hre.ethers.utils.formatBytes32String('VinuSwap Position')
             )
             console.log('Deployed position descriptor.')
 
             positionManagerContract = await positionManagerBlueprint.deploy(
                 factoryContract.address,
-                weth9Address,
+                WETH,
                 positionDescriptorContract.address
             )
             console.log('Deployed position manager.')
@@ -312,19 +311,16 @@ describe('test BasePool', function () {
 
             expect(contract.address).to.be.a('string')
 
-            // TODO: Replace with the actual WETH9 address
-            const weth9Address = ZERO_ADDRESS
-
-            routerContract = await routerBlueprint.deploy(factoryContract.address, weth9Address)
+            routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
 
             positionDescriptorContract = await positionDescriptorBlueprint.deploy(
-                weth9Address,
+                WETH,
                 hre.ethers.utils.formatBytes32String('VinuSwap Position')
             )
 
             positionManagerContract = await positionManagerBlueprint.deploy(
                 factoryContract.address,
-                weth9Address,
+                WETH,
                 positionDescriptorContract.address
             )
             console.log('Deployed position manager.')
