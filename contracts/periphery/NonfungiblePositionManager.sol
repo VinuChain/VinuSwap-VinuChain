@@ -91,9 +91,7 @@ contract NonfungiblePositionManager is
             int24 tickUpper,
             uint128 liquidity,
             uint256 feeGrowthInside0LastX128,
-            uint256 feeGrowthInside1LastX128,
-            uint128 tokensOwed0,
-            uint128 tokensOwed1
+            uint256 feeGrowthInside1LastX128
         )
     {
         Position memory position = _positions[tokenId];
@@ -109,7 +107,23 @@ contract NonfungiblePositionManager is
             position.tickUpper,
             position.liquidity,
             position.feeGrowthInside0LastX128,
-            position.feeGrowthInside1LastX128,
+            position.feeGrowthInside1LastX128
+        );
+    }
+
+    /// @inheritdoc INonfungiblePositionManager
+    function tokensOwed(uint256 tokenId)
+        external
+        view
+        override
+        returns (
+            uint128 tokensOwed0,
+            uint128 tokensOwed1
+        )
+    {
+        Position memory position = _positions[tokenId];
+        require(position.poolId != 0, 'Invalid token ID');
+        return (
             position.tokensOwed0,
             position.tokensOwed1
         );

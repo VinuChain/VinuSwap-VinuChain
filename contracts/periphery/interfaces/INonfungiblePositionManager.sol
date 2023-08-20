@@ -43,7 +43,7 @@ interface INonfungiblePositionManager is
     /// @param amount1 The amount of token1 owed to the position that was collected
     event Collect(uint256 indexed tokenId, address recipient, uint256 amount0, uint256 amount1);
 
-    /// @notice Returns the position information associated with a given token ID.
+    /// @notice Returns the position information (except owed tokens) associated with a given token ID.
     /// @dev Throws if the token ID is not valid.
     /// @param tokenId The ID of the token that represents the position
     /// @return nonce The nonce for permits
@@ -56,8 +56,6 @@ interface INonfungiblePositionManager is
     /// @return liquidity The liquidity of the position
     /// @return feeGrowthInside0LastX128 The fee growth of token0 as of the last action on the individual position
     /// @return feeGrowthInside1LastX128 The fee growth of token1 as of the last action on the individual position
-    /// @return tokensOwed0 The uncollected amount of token0 owed to the position as of the last computation
-    /// @return tokensOwed1 The uncollected amount of token1 owed to the position as of the last computation
     function positions(uint256 tokenId)
         external
         view
@@ -71,7 +69,18 @@ interface INonfungiblePositionManager is
             int24 tickUpper,
             uint128 liquidity,
             uint256 feeGrowthInside0LastX128,
-            uint256 feeGrowthInside1LastX128,
+            uint256 feeGrowthInside1LastX128
+        );
+    
+    /// @notice Returns the owed token information associated with a given token ID.
+    /// @dev Throws if the token ID is not valid.
+    /// @param tokenId The ID of the token that represents the position
+    /// @return tokensOwed0 The uncollected amount of token0 owed to the position as of the last computation
+    /// @return tokensOwed1 The uncollected amount of token1 owed to the position as of the last computation
+    function tokensOwed(uint256 tokenId)
+        external
+        view
+        returns (
             uint128 tokensOwed0,
             uint128 tokensOwed1
         );
