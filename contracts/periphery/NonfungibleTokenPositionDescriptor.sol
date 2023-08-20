@@ -52,7 +52,7 @@ contract NonfungibleTokenPositionDescriptor is INonfungibleTokenPositionDescript
         override
         returns (string memory)
     {
-        (, , address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, , ,  ) =
+        (, , address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, , , ,  ) =
             positionManager.positions(tokenId);
 
         IUniswapV3Pool pool =

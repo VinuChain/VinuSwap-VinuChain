@@ -46,6 +46,8 @@ contract NonfungiblePositionManager is
         // the fee growth of the aggregate position as of the last action on the individual position
         uint256 feeGrowthInside0LastX128;
         uint256 feeGrowthInside1LastX128;
+        // timestamp before which the token is locked (0 = unlocked)
+        uint256 lockedUntil;
         // how many uncollected tokens are owed to the position, as of the last computation
         uint128 tokensOwed0;
         uint128 tokensOwed1;
@@ -72,7 +74,7 @@ contract NonfungiblePositionManager is
         address _factory,
         address _WETH9,
         address _tokenDescriptor_
-    ) ERC721Permit('VinuSwap Positions NFT-V1', 'VS-POS', '1') PeripheryImmutableState(_factory, _WETH9) {
+    ) ERC721Permit('VinuSwap Positions NFT', 'VS-POS', '1') PeripheryImmutableState(_factory, _WETH9) {
         _tokenDescriptor = _tokenDescriptor_;
     }
 
@@ -91,7 +93,8 @@ contract NonfungiblePositionManager is
             int24 tickUpper,
             uint128 liquidity,
             uint256 feeGrowthInside0LastX128,
-            uint256 feeGrowthInside1LastX128
+            uint256 feeGrowthInside1LastX128,
+            uint256 lockedUntil
         )
     {
         Position memory position = _positions[tokenId];
@@ -107,7 +110,8 @@ contract NonfungiblePositionManager is
             position.tickUpper,
             position.liquidity,
             position.feeGrowthInside0LastX128,
-            position.feeGrowthInside1LastX128
+            position.feeGrowthInside1LastX128,
+            position.lockedUntil
         );
     }
 
@@ -179,7 +183,15 @@ contract NonfungiblePositionManager is
                 PoolAddress.PoolKey({token0: params.token0, token1: params.token1, fee: params.fee})
             );
 
-        _positions[tokenId] = Position({
+        // This form is equivalent to the commented assignment below, but
+        // the contract size is slightly smaller (~300 bytes)
+        _positions[tokenId].poolId = poolId;
+        _positions[tokenId].tickLower = params.tickLower;
+        _positions[tokenId].tickUpper = params.tickUpper;
+        _positions[tokenId].liquidity = liquidity;
+        _positions[tokenId].feeGrowthInside0LastX128 = feeGrowthInside0LastX128;
+        _positions[tokenId].feeGrowthInside1LastX128 = feeGrowthInside1LastX128;
+        /*_positions[tokenId] = Position({
             nonce: 0,
             operator: address(0),
             poolId: poolId,
@@ -189,8 +201,9 @@ contract NonfungiblePositionManager is
             feeGrowthInside0LastX128: feeGrowthInside0LastX128,
             feeGrowthInside1LastX128: feeGrowthInside1LastX128,
             tokensOwed0: 0,
-            tokensOwed1: 0
-        });
+            tokensOwed1: 0,
+            lockedUntil: 0
+        });*/
 
         emit IncreaseLiquidity(tokenId, liquidity, amount0, amount1);
     }
@@ -278,6 +291,8 @@ contract NonfungiblePositionManager is
     {
         require(params.liquidity > 0);
         Position storage position = _positions[params.tokenId];
+
+        require(block.timestamp >= position.lockedUntil, 'Locked');
 
         uint128 positionLiquidity = position.liquidity;
         require(positionLiquidity >= params.liquidity);
@@ -410,5 +425,15 @@ contract NonfungiblePositionManager is
     function _approve(address to, uint256 tokenId) internal override(ERC721) {
         _positions[tokenId].operator = to;
         emit Approval(ownerOf(tokenId), to, tokenId);
+    }
+
+    /// @inheritdoc INonfungiblePositionManager
+    function lock(uint256 tokenId, uint256 lockedUntil, uint256 deadline) external override isAuthorizedForToken(tokenId) checkDeadline(deadline) {
+        Position storage position = _positions[tokenId];
+        require(lockedUntil > block.timestamp && lockedUntil > position.lockedUntil, 'Invalid lockedUntil');
+
+        position.lockedUntil = lockedUntil;
+
+        emit Lock(tokenId, lockedUntil);
     }
 }

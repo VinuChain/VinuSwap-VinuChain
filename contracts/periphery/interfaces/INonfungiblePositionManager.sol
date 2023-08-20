@@ -42,6 +42,10 @@ interface INonfungiblePositionManager is
     /// @param amount0 The amount of token0 owed to the position that was collected
     /// @param amount1 The amount of token1 owed to the position that was collected
     event Collect(uint256 indexed tokenId, address recipient, uint256 amount0, uint256 amount1);
+    /// @notice Emitted when a position NFT is locked
+    /// @param tokenId The ID of the token for which underlying tokens are locked
+    /// @param lockedUntil The timestamp until which the token is locked
+    event Lock(uint256 tokenId, uint256 lockedUntil);
 
     /// @notice Returns the position information (except owed tokens) associated with a given token ID.
     /// @dev Throws if the token ID is not valid.
@@ -56,6 +60,7 @@ interface INonfungiblePositionManager is
     /// @return liquidity The liquidity of the position
     /// @return feeGrowthInside0LastX128 The fee growth of token0 as of the last action on the individual position
     /// @return feeGrowthInside1LastX128 The fee growth of token1 as of the last action on the individual position
+    /// @return lockedUntil The timestamp after which liquidity can be decreased
     function positions(uint256 tokenId)
         external
         view
@@ -69,7 +74,8 @@ interface INonfungiblePositionManager is
             int24 tickUpper,
             uint128 liquidity,
             uint256 feeGrowthInside0LastX128,
-            uint256 feeGrowthInside1LastX128
+            uint256 feeGrowthInside1LastX128,
+            uint256 lockedUntil
         );
     
     /// @notice Returns the owed token information associated with a given token ID.
@@ -186,4 +192,10 @@ interface INonfungiblePositionManager is
     /// must be collected first.
     /// @param tokenId The ID of the token that is being burned
     function burn(uint256 tokenId) external payable;
+
+    // @notice Locks a token, which prevents removing liquidity from the position
+    // @param tokenId The ID of the token that is being locked
+    // @param lockedUntil The time until which the token is locked
+    // @param deadline The time by which the transaction must be included to effect the change
+    function lock(uint256 tokenId, uint256 lockedUntil, uint256 deadline) external;
 }
