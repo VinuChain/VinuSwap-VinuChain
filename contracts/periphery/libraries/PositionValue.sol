@@ -41,7 +41,7 @@ library PositionValue {
         uint256 tokenId,
         uint160 sqrtRatioX96
     ) internal view returns (uint256 amount0, uint256 amount1) {
-        (, , , , , int24 tickLower, int24 tickUpper, uint128 liquidity, , , , ) = positionManager.positions(tokenId);
+        (, , , , , int24 tickLower, int24 tickUpper, uint128 liquidity, , ) = positionManager.positions(tokenId);
 
         return
             LiquidityAmounts.getAmountsForLiquidity(
@@ -85,10 +85,13 @@ library PositionValue {
             int24 tickUpper,
             uint128 liquidity,
             uint256 positionFeeGrowthInside0LastX128,
-            uint256 positionFeeGrowthInside1LastX128,
+            uint256 positionFeeGrowthInside1LastX128
+        ) = positionManager.positions(tokenId);
+
+        (
             uint256 tokensOwed0,
             uint256 tokensOwed1
-        ) = positionManager.positions(tokenId);
+        ) = positionManager.tokensOwed(tokenId);
 
         return
             _fees(
