@@ -276,7 +276,8 @@ describe('test BasePool', function () {
         })
 
         describe('sanity checks', function () {
-
+            // These tests do not cover new features, they are only meant
+            // to make sure that the contract is working as usual
             describe('liquidity', function () {
                 it('deposits liquidity', async function () {
                     await contract.initialize(encodePriceSqrt(BigNumber.from(1)))
@@ -453,9 +454,105 @@ describe('test BasePool', function () {
             })
 
             describe('swapping', function () {
-                it('swaps', async function () {
-                    // TODO
-                    // TODO: Check that the revenue is split correctly
+                it('swaps with exact input', async function () {
+                    const [alice] = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
+                    await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                    const mintParams = {
+                        token0 : TOKEN_0,
+                        token1 : TOKEN_1,
+                        fee : FEE,
+                        tickLower : -887272,
+                        tickUpper : 887272,
+                        amount0Desired : 1000,
+                        amount1Desired : 3000, // We're setting 3k, but only 2k will be taken
+                        amount0Min : 0,
+                        amount1Min : 0,
+                        recipient : deployer.address,
+                        deadline : await time.latest() + 1000000
+                    }
+
+                    const initialToken0Balance = await token0Contract.balanceOf(deployer.address)
+                    const initialToken1Balance = await token1Contract.balanceOf(deployer.address)
+
+                    await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                    await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                    await positionManagerContract.connect(deployer).mint(mintParams)
+
+                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
+                    await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
+
+                    await token0Contract.connect(alice).approve(routerContract.address, '100')
+
+                    const swapParams = {
+                        tokenIn : TOKEN_0,
+                        tokenOut : TOKEN_1,
+                        fee : FEE,
+                        recipient : alice.address,
+                        deadline : await time.latest() + 1000000,
+                        amountIn : 100,
+                        amountOutMinimum : 71,
+                        sqrtPriceLimitX96 : 0
+                    }
+
+                    await routerContract.connect(alice).exactInputSingle(swapParams)
+
+                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
+                    await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
+                    await checkQuery('balanceOf', [alice.address], [0], token0Contract)
+                    await checkQuery('balanceOf', [alice.address], [100 + 171], token1Contract)
+                })
+                it('swaps with exact output', async function () {
+                    const [alice] = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
+                    await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                    const mintParams = {
+                        token0 : TOKEN_0,
+                        token1 : TOKEN_1,
+                        fee : FEE,
+                        tickLower : -887272,
+                        tickUpper : 887272,
+                        amount0Desired : 1000,
+                        amount1Desired : 3000, // We're setting 3k, but only 2k will be taken
+                        amount0Min : 0,
+                        amount1Min : 0,
+                        recipient : deployer.address,
+                        deadline : await time.latest() + 1000000
+                    }
+
+                    const initialToken0Balance = await token0Contract.balanceOf(deployer.address)
+                    const initialToken1Balance = await token1Contract.balanceOf(deployer.address)
+
+                    await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                    await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                    await positionManagerContract.connect(deployer).mint(mintParams)
+
+                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
+                    await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
+
+                    await token0Contract.connect(alice).approve(routerContract.address, '100')
+
+                    const swapParams = {
+                        tokenIn : TOKEN_0,
+                        tokenOut : TOKEN_1,
+                        fee : FEE,
+                        recipient : alice.address,
+                        deadline : await time.latest() + 1000000,
+                        amountOut : 171,
+                        amountInMaximum : 100,
+                        sqrtPriceLimitX96 : 0
+                    }
+
+                    await routerContract.connect(alice).exactOutputSingle(swapParams)
+
+                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
+                    await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
+                    await checkQuery('balanceOf', [alice.address], [0], token0Contract)
+                    await checkQuery('balanceOf', [alice.address], [100 + 171], token1Contract)
                 })
             })
         })
