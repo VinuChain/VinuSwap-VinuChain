@@ -1,8 +1,8 @@
-import { BigNumber } from "@ethersproject/bignumber";
+import { BigNumber } from "@ethersproject/bignumber"
 import bn from 'bignumber.js'
 
-import chai from "chai";
-import chaiAsPromised from "chai-as-promised";
+import chai from "chai"
+import chaiAsPromised from "chai-as-promised"
 import { isNumberObject } from "util/types"
 
 
@@ -10,26 +10,27 @@ import hre from 'hardhat'
 hre.tracer.enabled = false
 
 import { ethers } from "hardhat"
-import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { time } from "@nomicfoundation/hardhat-network-helpers"
+import { splitSignature } from 'ethers/lib/utils'
 
-chai.use(chaiAsPromised);
+chai.use(chaiAsPromised)
 const expect = chai.expect
 
-let deployer: any;
+let deployer: any
 
-let factoryBlueprint : hre.ethers.ContractFactory;
-let contractBlueprint: ethers.ContractFactory;
-let routerBlueprint : hre.ethers.ContractFactory;
-let nftDescriptorLibraryBlueprint : hre.ethers.ContractFactory;
-let positionDescriptorBlueprint : hre.ethers.ContractFactory;
-let positionManagerBlueprint : hre.ethers.ContractFactory;
+let factoryBlueprint : hre.ethers.ContractFactory
+let contractBlueprint: ethers.ContractFactory
+let routerBlueprint : hre.ethers.ContractFactory
+let nftDescriptorLibraryBlueprint : hre.ethers.ContractFactory
+let positionDescriptorBlueprint : hre.ethers.ContractFactory
+let positionManagerBlueprint : hre.ethers.ContractFactory
 
-let factoryContract : any;
-let contract: any;
-let routerContract : any;
-let nftDescriptorLibraryContract : any;
-let positionDescriptorContract : any;
-let positionManagerContract : any;
+let factoryContract : any
+let contract: any
+let routerContract : any
+let nftDescriptorLibraryContract : any
+let positionDescriptorContract : any
+let positionManagerContract : any
 
 let mnemonicCounter = 1
 
@@ -58,6 +59,60 @@ function encodePriceSqrt(ratio : BigNumber){
       .toString()
   )
 }
+
+export default async function getPermitNFTSignature(
+    wallet: Wallet,
+    positionManager: NonfungiblePositionManager,
+    spender: string,
+    tokenId: BigNumberish,
+    deadline: BigNumberish = constants.MaxUint256,
+    permitConfig?: { nonce?: BigNumberish; name?: string; chainId?: number; version?: string }
+  ): Promise<Signature> {
+    const [nonce, name, version, chainId] = await Promise.all([
+      permitConfig?.nonce ?? positionManager.positions(tokenId).then((p) => p.nonce),
+      permitConfig?.name ?? positionManager.name(),
+      permitConfig?.version ?? '1',
+      permitConfig?.chainId ?? wallet.getChainId(),
+    ])
+  
+    return splitSignature(
+      await wallet._signTypedData(
+        {
+          name,
+          version,
+          chainId,
+          verifyingContract: positionManager.address,
+        },
+        {
+          Permit: [
+            {
+              name: 'spender',
+              type: 'address',
+            },
+            {
+              name: 'tokenId',
+              type: 'uint256',
+            },
+            {
+              name: 'nonce',
+              type: 'uint256',
+            },
+            {
+              name: 'deadline',
+              type: 'uint256',
+            },
+          ],
+        },
+        {
+          owner: wallet.address,
+          spender,
+          tokenId,
+          nonce,
+          deadline,
+        }
+      )
+    )
+  }
 
 const checkEvents = async (tx, correct : Array<Object>, referenceContract : any | undefined = undefined) => {
     if (!referenceContract) {
@@ -151,7 +206,7 @@ describe('test BasePool', function () {
         //provider = await vite.newProvider('http://127.0.0.1:23456')
         //deployer = vite.newAccount(config.networks.local.mnemonic, 0, provider)
 
-        const [a] = await ethers.getSigners();
+        const [a] = await ethers.getSigners()
         deployer = a
         console.log('Signer created.')
 
@@ -557,12 +612,278 @@ describe('test BasePool', function () {
             })
         })
 
-        describe('locking', function () {
-            it('fails to deposit with a past lock deadline', async function () {
-                // TODO
+        describe.only('locking', function () {
+            it('locks a position', async function () {
+                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                await positionManagerContract.connect(deployer).lock(1, await time.latest() + 30, await time.latest() + 1000000)
             })
-            it('fails to withdraw before the lock deadline', async function () {
-                // TODO
+            it('re-locks a position', async function () {
+                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                const lockedUntil = await time.latest() + 1000
+
+                await positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() + 1000000)
+
+                await time.setNextBlockTimestamp(lockedUntil)
+
+                await positionManagerContract.connect(deployer).lock(1, lockedUntil + 60, await time.latest() + 1000000)
+            })
+            it('locks someone else\'s position when approved', async function () {
+                const [alice] = await newUsers([])
+                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                // Approve Alice
+                const permitDeadline = await time.latest() + 100000
+                const { v, r, s } = await getPermitNFTSignature(deployer, positionManagerContract, alice.address, 1, permitDeadline)
+                await positionManagerContract.permit(alice.address, 1, permitDeadline, v, r, s)
+                expect((await positionManagerContract.positions(1)).nonce).to.eq(1)
+                expect((await positionManagerContract.positions(1)).operator).to.eq(alice.address)
+
+                const lockedUntil = await time.latest() + 1000
+                await positionManagerContract.connect(alice).lock(1, lockedUntil, await time.latest() + 1000000)
+            })
+            it('reduces liquidity after the lock deadline', async function () {
+                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                const lockedUntil = await time.latest() + 1000
+
+                await positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() + 1000000)
+
+                await time.setNextBlockTimestamp(lockedUntil)
+
+                const decreaseParams = {
+                    tokenId : 1,
+                    liquidity : 707, // Corresponding to 50% of the current liqudity
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await positionManagerContract.connect(deployer).decreaseLiquidity(decreaseParams)
+            })
+            it('fails to lock a non-existent token', async function () {
+                await expect(
+                    positionManagerContract.connect(deployer).lock(1, await time.latest() + 100, await time.latest() + 1000000)
+                ).to.be.eventually.rejectedWith('ERC721: operator query for nonexistent token')
+            })
+            it('fails to lock someone else\'s position without being approved', async function () {
+                const [alice] = await newUsers([])
+                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                await expect(
+                    positionManagerContract.connect(alice).lock(1, await time.latest() + 1000, await time.latest() + 1000000)
+                ).to.be.eventually.rejectedWith('Not approved')
+            })
+            it('fails to lock a position after the deadline', async function () {
+                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                const lockedUntil = await time.latest() + 1000
+
+                await expect(
+                    positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() - 1)
+                ).to.be.eventually.rejectedWith('Transaction too old')
+            })
+            it('fails to lock a position in the past', async function () {
+                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000, // We're setting 3k, but only 2k will be taken
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                const lockedUntil = await time.latest() - 1
+
+                await expect(
+                    positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() + 10000)
+                ).to.be.eventually.rejectedWith('Invalid lockedUntil')
+            })
+            it('fails to lock a position earlier than the current lock', async function () {
+                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                const lockedUntil = await time.latest() + 1000
+                await positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() + 1000000)
+
+                await expect(
+                    positionManagerContract.connect(deployer).lock(1, lockedUntil - 1, await time.latest() + 1000000)
+                ).to.be.eventually.rejectedWith('Invalid lockedUntil')
+            })
+            it('fails to reduce liquidity before the lock deadline', async function () {
+                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                const lockedUntil = await time.latest() + 1000
+                await positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() + 1000000)
+
+
+                const decreaseParams = {
+                    tokenId : 1,
+                    liquidity : 707, // Corresponding to 50% of the current liqudity
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await expect(
+                    positionManagerContract.connect(deployer).decreaseLiquidity(decreaseParams)
+                ).to.be.eventually.rejectedWith('Locked')
+
             })
         })
 
@@ -590,4 +911,4 @@ describe('test BasePool', function () {
         })
 
     })
-});
+})
