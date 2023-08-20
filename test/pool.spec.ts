@@ -269,130 +269,136 @@ describe('test BasePool', function () {
             console.log('Deployed position manager.')
         })
 
-        describe('liquidity', function () {
-            it('deposits liquidity', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(1)))
+        describe('sanity checks', function () {
 
-                const mintParams = {
-                    token0 : TOKEN_0,
-                    token1 : TOKEN_1,
-                    fee : 5, // TODO: Figure it out
-                    tickLower : -887272,
-                    tickUpper : 887272,
-                    amount0Desired : 1000,
-                    amount1Desired : 2000,
-                    amount0Min : 0,
-                    amount1Min : 0,
-                    recipient : deployer.address,
-                    deadline : await time.latest() + 1000000
-                }
+            describe('liquidity', function () {
+                it('deposits liquidity', async function () {
+                    await contract.initialize(encodePriceSqrt(BigNumber.from(1)))
 
-                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
-                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
-                await positionManagerContract.connect(deployer).mint(mintParams)
+                    const mintParams = {
+                        token0 : TOKEN_0,
+                        token1 : TOKEN_1,
+                        fee : 5, // TODO: Figure it out
+                        tickLower : -887272,
+                        tickUpper : 887272,
+                        amount0Desired : 1000,
+                        amount1Desired : 2000,
+                        amount0Min : 0,
+                        amount1Min : 0,
+                        recipient : deployer.address,
+                        deadline : await time.latest() + 1000000
+                    }
 
+                    await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                    await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                    await positionManagerContract.connect(deployer).mint(mintParams)
+
+                })
+                it('deposits and increases liquidity', async function () {
+                    await contract.initialize(encodePriceSqrt(BigNumber.from(1)))
+
+                    const mintParams = {
+                        token0 : TOKEN_0,
+                        token1 : TOKEN_1,
+                        fee : 5, // TODO: Figure it out
+                        tickLower : -887272,
+                        tickUpper : 887272,
+                        amount0Desired : 1000,
+                        amount1Desired : 2000,
+                        amount0Min : 0,
+                        amount1Min : 0,
+                        recipient : deployer.address,
+                        deadline : await time.latest() + 1000000
+                    }
+
+                    await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                    await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                    await positionManagerContract.connect(deployer).mint(mintParams)
+
+                    const increaseParams = {
+                        tokenId : 1,
+                        amount0Desired : 50,
+                        amount1Desired : 100,
+                        amount0Min: 0,
+                        amount1Min : 0,
+                        deadline: await time.latest() + 1000000
+                    }
+
+                    await token0Contract.connect(deployer).approve(positionManagerContract.address, '50')
+                    await token1Contract.connect(deployer).approve(positionManagerContract.address, '100')
+
+                    await positionManagerContract.connect(deployer).increaseLiquidity(increaseParams)
+
+                })
+                it('deposits and decreases liquidity', async function () {
+                    await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                    const mintParams = {
+                        token0 : TOKEN_0,
+                        token1 : TOKEN_1,
+                        fee : 5, // TODO: Figure it out
+                        tickLower : -887272,
+                        tickUpper : 887272,
+                        amount0Desired : 1000,
+                        amount1Desired : 3000,
+                        amount0Min : 0,
+                        amount1Min : 0,
+                        recipient : deployer.address,
+                        deadline : await time.latest() + 1000000
+                    }
+
+                    const initialToken0Balance = await token0Contract.balanceOf(deployer.address)
+                    const initialToken1Balance = await token1Contract.balanceOf(deployer.address)
+
+                    await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                    await token1Contract.connect(deployer).approve(positionManagerContract.address, '3000')
+                    await positionManagerContract.connect(deployer).mint(mintParams)
+
+                    await checkQuery('liquidity', [], [1414], contract)
+
+                    const decreaseParams = {
+                        tokenId : 1,
+                        liquidity : 707, // Corresponding to 50% of the current liqudity
+                        amount0Min : 0,
+                        amount1Min : 0,
+                        deadline : await time.latest() + 1000000
+                    }
+
+                    await positionManagerContract.connect(deployer).decreaseLiquidity(decreaseParams)
+
+                    await checkQuery('liquidity', [], [707], contract)
+                    // Since the current ratio was 2:1, the obtained amounts are 2:1 as well
+                    // Note that the amounts are not exact because of rounding
+                    await checkQuery('tokensOwed', [1], [499, 999], positionManagerContract)
+
+                    const collectParams = {
+                        tokenId : 1,
+                        recipient : deployer.address,
+                        amount0Max : 1000,
+                        amount1Max : 2000
+                    }
+
+                    await positionDescriptorContract.connect(deployer).collect(collectParams)
+
+                    await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000).add(100)], token0Contract)
+                    await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000).add(200)], token1Contract)
+                })
             })
-            it('deposits and increases liquidity', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(1)))
 
-                const mintParams = {
-                    token0 : TOKEN_0,
-                    token1 : TOKEN_1,
-                    fee : 5, // TODO: Figure it out
-                    tickLower : -887272,
-                    tickUpper : 887272,
-                    amount0Desired : 1000,
-                    amount1Desired : 2000,
-                    amount0Min : 0,
-                    amount1Min : 0,
-                    recipient : deployer.address,
-                    deadline : await time.latest() + 1000000
-                }
-
-                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
-                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
-                await positionManagerContract.connect(deployer).mint(mintParams)
-
-                const increaseParams = {
-                    tokenId : 1,
-                    amount0Desired : 50,
-                    amount1Desired : 100,
-                    amount0Min: 0,
-                    amount1Min : 0,
-                    deadline: await time.latest() + 1000000
-                }
-
-                await token0Contract.connect(deployer).approve(positionManagerContract.address, '50')
-                await token1Contract.connect(deployer).approve(positionManagerContract.address, '100')
-
-                await positionManagerContract.connect(deployer).increaseLiquidity(increaseParams)
-
+            describe('swapping', function () {
+                it('swaps', async function () {
+                    // TODO
+                    // TODO: Check that the revenue is split correctly
+                })
             })
-            it('deposits and decreases liquidity', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+        })
 
-                const mintParams = {
-                    token0 : TOKEN_0,
-                    token1 : TOKEN_1,
-                    fee : 5, // TODO: Figure it out
-                    tickLower : -887272,
-                    tickUpper : 887272,
-                    amount0Desired : 1000,
-                    amount1Desired : 3000,
-                    amount0Min : 0,
-                    amount1Min : 0,
-                    recipient : deployer.address,
-                    deadline : await time.latest() + 1000000
-                }
-
-                const initialToken0Balance = await token0Contract.balanceOf(deployer.address)
-                const initialToken1Balance = await token1Contract.balanceOf(deployer.address)
-
-                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
-                await token1Contract.connect(deployer).approve(positionManagerContract.address, '3000')
-                await positionManagerContract.connect(deployer).mint(mintParams)
-
-                await checkQuery('liquidity', [], [1414], contract)
-
-                const decreaseParams = {
-                    tokenId : 1,
-                    liquidity : 707, // Corresponding to 50% of the current liqudity
-                    amount0Min : 0,
-                    amount1Min : 0,
-                    deadline : await time.latest() + 1000000
-                }
-
-                await positionManagerContract.connect(deployer).decreaseLiquidity(decreaseParams)
-
-                await checkQuery('liquidity', [], [707], contract)
-                // Since the current ratio was 2:1, the obtained amounts are 2:1 as well
-                // Note that the amounts are not exact because of rounding
-                await checkQuery('tokensOwed', [1], [499, 999], positionManagerContract)
-
-                const collectParams = {
-                    tokenId : 1,
-                    recipient : deployer.address,
-                    amount0Max : 1000,
-                    amount1Max : 2000
-                }
-
-                await positionDescriptorContract.connect(deployer).collect(collectParams)
-
-                await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000).add(100)], token0Contract)
-                await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000).add(200)], token1Contract)
-            })
+        describe('locking', function () {
             it('fails to deposit with a past lock deadline', async function () {
                 // TODO
             })
             it('fails to withdraw before the lock deadline', async function () {
                 // TODO
-            })
-        })
-
-        describe('swapping', function () {
-            it('swaps', async function () {
-                // TODO
-                // TODO: Check that the revenue is split correctly
             })
         })
 
