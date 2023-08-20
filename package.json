@@ -11,10 +11,12 @@
     "@uniswap/lib": "^4.0.1-alpha",
     "@uniswap/v3-core": "^1.0.1",
     "base64-sol": "^1.1.0",
+    "bignumber.js": "^9.1.1",
     "chai-as-promised": "^7.1.1",
     "ethers": "^5.0.0",
     "hardhat": "^2.14.0",
     "hardhat-contract-sizer": "^2.8.0",
+    "hardhat-tracer": "^2.6.0",
     "solidity-docgen": "^0.6.0-beta.35",
     "ts-node": "^10.7.0"
   },
@@ -43,6 +45,6 @@
   "scripts": {
     "test_legacy": "./node_modules/.bin/mocha --full-trace --config ./test/mocharc.nightly.json",
     "preprocess": "npx ts-node scripts/preprocess_for_tests.ts",
-    "test": "TS_NODE_FILES=true && npm run preprocess && npx hardhat test"
+    "test": "TS_NODE_FILES=true && npm run preprocess && npx hardhat test --trace"
   }
 }
