@@ -5,7 +5,7 @@ pragma solidity >=0.5.0;
 /// @notice A contract that constructs a pool must implement this to pass arguments to the pool
 /// @dev This is used to avoid having constructor arguments in the pool contract, which results in the init code hash
 /// of the pool being constant allowing the CREATE2 address of the pool to be cheaply computed on-chain
-interface IUniswapV3PoolDeployer {
+interface IVinuSwapPoolDeployer {
     /// @notice Get the parameters to be used in constructing the pool, set transiently during pool creation.
     /// @dev Called by the pool constructor to fetch the parameters of the pool
     /// Returns factory The factory address
@@ -21,6 +21,7 @@ interface IUniswapV3PoolDeployer {
             address token0,
             address token1,
             uint24 fee,
-            int24 tickSpacing
+            int24 tickSpacing,
+            address feeManager
         );
 }
