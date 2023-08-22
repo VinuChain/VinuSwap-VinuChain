@@ -18,6 +18,7 @@ const expect = chai.expect
 
 let deployer: any
 
+let controllerBlueprint : hre.ethers.ContractFactory
 let tieredDiscountBlueprint : hre.ethers.ContractFactory
 let noDiscountBlueprint : hre.ethers.ContractFactory
 let factoryBlueprint : hre.ethers.ContractFactory
@@ -218,7 +219,11 @@ describe('test BasePool', function () {
         token0Contract = await erc20Blueprint.deploy()
         TOKEN_0 = token0Contract.address
 
-        token1Contract = await erc20Blueprint.deploy()
+        // TOKEN_1 is always greater than TOKEN_0
+        while (token1Contract == undefined || token1Contract.address < token0Contract.address) {
+            token1Contract = await erc20Blueprint.deploy()
+        }
+
         TOKEN_1 = token1Contract.address
 
         const weth9Blueprint = await hre.ethers.getContractFactory('WETH9')
@@ -240,6 +245,8 @@ describe('test BasePool', function () {
         const poolInitHelperBlueprint = await hre.ethers.getContractFactory('PoolInitHelper')
         const poolInitHelperContract = await poolInitHelperBlueprint.deploy()
         console.log('Init code hash:', await poolInitHelperContract.getInitCodeHash())
+
+        controllerBlueprint = await hre.ethers.getContractFactory('Controller')
 
         tieredDiscountBlueprint = await hre.ethers.getContractFactory('TieredDiscount')
         noDiscountBlueprint = await hre.ethers.getContractFactory('NoDiscount')
@@ -877,6 +884,384 @@ describe('test BasePool', function () {
                     positionManagerContract.connect(deployer).decreaseLiquidity(decreaseParams)
                 ).to.be.eventually.rejectedWith('Locked')
 
+            })
+        })
+
+        describe('controller', function () {
+            describe('controller setup', function () {
+                it('deploys a controller', async function () {
+                    const [alice, bob, charlie, dan] = await newUsers([], [], [], [])
+                    const controller = await controllerBlueprint.connect(dan).deploy(
+                        [alice.address, bob.address, charlie.address],
+                        [100, 200, 700]
+                    )
+                    expect(controller.address).to.be.a('string')
+                })
+
+                it('fails to deploy a controller with no accounts', async function () {
+                    const [dan] = await newUsers([])
+                    await expect(
+                        controllerBlueprint.connect(dan).deploy(
+                            [],
+                            []
+                        )
+                    ).to.be.eventually.rejectedWith('At least one account is required')
+                })
+
+                it('fails to deploy a controller with mismatching accounts and shares', async function () {
+                    const [alice, bob, charlie, dan] = await newUsers([], [], [], [])
+                    await expect(
+                        controllerBlueprint.connect(dan).deploy(
+                            [alice.address, bob.address, charlie.address],
+                            [100, 200]
+                        )
+                    ).to.be.eventually.rejectedWith('Accounts and shares must have the same length')
+                })
+
+                it('fails to deploy a controller with a zero address account', async function () {
+                    const [alice, bob, dan] = await newUsers([], [], [])
+                    await expect(
+                        controllerBlueprint.connect(dan).deploy(
+                            [alice.address, bob.address, ZERO_ADDRESS],
+                            [100, 200, 700]
+                        )
+                    ).to.be.eventually.rejectedWith('Account must not be the zero address')
+                })
+
+                it('fails to deploy a controller with a zero share account', async function () {
+                    const [alice, bob, charlie, dan] = await newUsers([], [], [], [])
+                    await expect(
+                        controllerBlueprint.connect(dan).deploy(
+                            [alice.address, bob.address, charlie.address],
+                            [100, 0, 700]
+                        )
+                    ).to.be.eventually.rejectedWith('Shares must be greater than zero')
+                })
+
+                it('fails to deploy a controller with duplicated accounts', async function () {
+                    const [alice, bob, dan] = await newUsers([], [], [])
+                    await expect(
+                        controllerBlueprint.connect(dan).deploy(
+                            [alice.address, bob.address, bob.address],
+                            [100, 200, 700]
+                        )
+                    ).to.be.eventually.rejectedWith('Account already has shares')
+                })
+            })
+
+            describe('controller usage', function () {
+                let controllerContract : any
+                let mockPoolBlueprint :  hre.ethers.ContractFactory
+                let mockPoolContract : any
+                let alice, bob, charlie, dan
+
+                before(async function () {
+                    mockPoolBlueprint = await ethers.getContractFactory('MockPool')
+                })
+
+                beforeEach(async function () {
+                    const users = await newUsers([], [], [], [])
+                    alice = users[0]
+                    bob = users[1]
+                    charlie = users[2]
+                    dan = users[3]
+
+                    controllerContract = await controllerBlueprint.connect(dan).deploy(
+                        [alice.address, bob.address, charlie.address],
+                        [100, 200, 700]
+                    )
+                    await checkQuery('totalShares', [], [1000], controllerContract)
+                    mockPoolContract = await mockPoolBlueprint.deploy(TOKEN_0, TOKEN_1)
+                })
+                it('collects fees from a mock pool', async function () {
+                    await token0Contract.connect(deployer).approve(mockPoolContract.address, 1000)
+                    await token1Contract.connect(deployer).approve(mockPoolContract.address, 2000)
+                    await mockPoolContract.connect(deployer).deposit(1000, 2000)
+
+                    await controllerContract.connect(alice).collectProtocolFees(mockPoolContract.address, 1000, 2000)
+
+                    // Alice has 10% of the shares
+                    await checkQuery('balanceOf', [alice.address, TOKEN_0], [100], controllerContract)
+                    await checkQuery('balanceOf', [alice.address, TOKEN_1], [200], controllerContract)
+
+                    // Bob has 20% of the shares
+                    await checkQuery('balanceOf', [bob.address, TOKEN_0], [200], controllerContract)
+                    await checkQuery('balanceOf', [bob.address, TOKEN_1], [400], controllerContract)
+
+                    // Charlie has 70% of the shares
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_0], [700], controllerContract)
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_1], [1400], controllerContract)
+                })
+                it('collects requests larger than the protocol fees', async function () {
+                    await token0Contract.connect(deployer).approve(mockPoolContract.address, 1000)
+                    await token1Contract.connect(deployer).approve(mockPoolContract.address, 2000)
+                    await mockPoolContract.connect(deployer).deposit(1000, 2000)
+
+                    // There's only 1000 and 2000 in the contract, but we request 1100 and 2100
+                    await controllerContract.connect(alice).collectProtocolFees(mockPoolContract.address, 1100, 2100)
+
+                    // Alice has 10% of the shares
+                    await checkQuery('balanceOf', [alice.address, TOKEN_0], [100], controllerContract)
+                    await checkQuery('balanceOf', [alice.address, TOKEN_1], [200], controllerContract)
+
+                    // Bob has 20% of the shares
+                    await checkQuery('balanceOf', [bob.address, TOKEN_0], [200], controllerContract)
+                    await checkQuery('balanceOf', [bob.address, TOKEN_1], [400], controllerContract)
+
+                    // Charlie has 70% of the shares
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_0], [700], controllerContract)
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_1], [1400], controllerContract)
+                })
+                it('correctly handles rounding errors', async function () {
+                    await token0Contract.connect(deployer).approve(mockPoolContract.address, 1000001)
+                    await token1Contract.connect(deployer).approve(mockPoolContract.address, 2000001)
+                    await mockPoolContract.connect(deployer).deposit(1000001, 2000001)
+
+                    await controllerContract.connect(alice).collectProtocolFees(mockPoolContract.address, 1000001, 2000001)
+
+                    // Alice has 10% of the shares, but receives the dust
+                    await checkQuery('balanceOf', [alice.address, TOKEN_0], [100001], controllerContract)
+                    await checkQuery('balanceOf', [alice.address, TOKEN_1], [200001], controllerContract)
+
+                    // Bob has 20% of the shares
+                    await checkQuery('balanceOf', [bob.address, TOKEN_0], [200000], controllerContract)
+                    await checkQuery('balanceOf', [bob.address, TOKEN_1], [400000], controllerContract)
+
+                    // Charlie has 70% of the shares
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_0], [700000], controllerContract)
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_1], [1400000], controllerContract)
+                })
+                it('fails to collect without being an account or the owner', async function () {
+                    await token0Contract.connect(deployer).approve(mockPoolContract.address, 1000)
+                    await token1Contract.connect(deployer).approve(mockPoolContract.address, 2000)
+                    await mockPoolContract.connect(deployer).deposit(1000, 2000)
+
+                    const [eric] = await newUsers([])
+
+                    await expect(
+                        controllerContract.connect(eric).collectProtocolFees(mockPoolContract.address, 1000, 2000)
+                    ).to.be.eventually.rejectedWith('Not an account or owner')
+                })
+                it('withdraws', async function () {
+                    await token0Contract.connect(deployer).approve(mockPoolContract.address, 1000)
+                    await token1Contract.connect(deployer).approve(mockPoolContract.address, 2000)
+                    await mockPoolContract.connect(deployer).deposit(1000, 2000)
+
+                    await controllerContract.connect(dan).collectProtocolFees(mockPoolContract.address, 1000, 2000)
+
+                    // Alice has 10% of the shares
+                    await checkQuery('balanceOf', [alice.address, TOKEN_0], [100], controllerContract)
+                    await checkQuery('balanceOf', [alice.address, TOKEN_1], [200], controllerContract)
+
+                    // Bob has 20% of the shares
+                    await checkQuery('balanceOf', [bob.address, TOKEN_0], [200], controllerContract)
+                    await checkQuery('balanceOf', [bob.address, TOKEN_1], [400], controllerContract)
+
+                    // Charlie has 70% of the shares
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_0], [700], controllerContract)
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_1], [1400], controllerContract)
+
+                    await controllerContract.connect(alice).withdraw(TOKEN_0, 40)
+                    await checkQuery('balanceOf', [alice.address, TOKEN_0], [60], controllerContract)
+                    await checkQuery('balanceOf', [alice.address], [40], token0Contract)
+                })
+                it('fails to withdraw more than the balance', async function () {
+                    await token0Contract.connect(deployer).approve(mockPoolContract.address, 1000)
+                    await token1Contract.connect(deployer).approve(mockPoolContract.address, 2000)
+                    await mockPoolContract.connect(deployer).deposit(1000, 2000)
+
+                    await controllerContract.connect(dan).collectProtocolFees(mockPoolContract.address, 1000, 2000)
+
+                    // Alice has 10% of the shares
+                    await checkQuery('balanceOf', [alice.address, TOKEN_0], [100], controllerContract)
+                    await checkQuery('balanceOf', [alice.address, TOKEN_1], [200], controllerContract)
+
+                    // Bob has 20% of the shares
+                    await checkQuery('balanceOf', [bob.address, TOKEN_0], [200], controllerContract)
+                    await checkQuery('balanceOf', [bob.address, TOKEN_1], [400], controllerContract)
+
+                    // Charlie has 70% of the shares
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_0], [700], controllerContract)
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_1], [1400], controllerContract)
+
+                    await expect(
+                        controllerContract.connect(alice).withdraw(TOKEN_0, 101)
+                    ).to.be.eventually.rejectedWith('Insufficient balance')
+                })
+                it('fails to withdraw 0', async function () {
+                    await token0Contract.connect(deployer).approve(mockPoolContract.address, 1000)
+                    await token1Contract.connect(deployer).approve(mockPoolContract.address, 2000)
+                    await mockPoolContract.connect(deployer).deposit(1000, 2000)
+
+                    await controllerContract.connect(dan).collectProtocolFees(mockPoolContract.address, 1000, 2000)
+
+                    // Alice has 10% of the shares
+                    await checkQuery('balanceOf', [alice.address, TOKEN_0], [100], controllerContract)
+                    await checkQuery('balanceOf', [alice.address, TOKEN_1], [200], controllerContract)
+
+                    // Bob has 20% of the shares
+                    await checkQuery('balanceOf', [bob.address, TOKEN_0], [200], controllerContract)
+                    await checkQuery('balanceOf', [bob.address, TOKEN_1], [400], controllerContract)
+
+                    // Charlie has 70% of the shares
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_0], [700], controllerContract)
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_1], [1400], controllerContract)
+
+                    await expect(
+                        controllerContract.connect(alice).withdraw(TOKEN_0, 0)
+                    ).to.be.eventually.rejectedWith('Cannot withdraw 0')
+                })
+                it('collects fees from an actual pool', async function () {
+                    const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    const contractAddress = (await tx.wait()).events[0].args.pool
+
+                    contract = contractBlueprint.attach(contractAddress)
+
+                    expect(contract.address).to.be.a('string')
+
+                    routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
+
+                    positionDescriptorContract = await positionDescriptorBlueprint.deploy(
+                        WETH,
+                        hre.ethers.utils.formatBytes32String('VinuSwap Position')
+                    )
+
+                    positionManagerContract = await positionManagerBlueprint.deploy(
+                        factoryContract.address,
+                        WETH,
+                        positionDescriptorContract.address
+                    )
+
+                    const [eric] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
+                    await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                    const mintParams = {
+                        token0 : TOKEN_0,
+                        token1 : TOKEN_1,
+                        fee : 100000,
+                        tickLower : -887272,
+                        tickUpper : 887272,
+                        amount0Desired : MONE.mul(1000),
+                        amount1Desired : MONE.mul(2000),
+                        amount0Min : 0,
+                        amount1Min : 0,
+                        recipient : deployer.address,
+                        deadline : await time.latest() + 1000000
+                    }
+
+                    await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+                    await token1Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(3000))
+                    await positionManagerContract.connect(deployer).mint(mintParams)
+
+                    await token0Contract.connect(eric).approve(routerContract.address, MONE)
+
+                    const swapParams = {
+                        tokenIn : TOKEN_0,
+                        tokenOut : TOKEN_1,
+                        fee : 100000,
+                        recipient : eric.address,
+                        deadline : await time.latest() + 1000000,
+                        amountIn : MONE,
+                        amountOutMinimum : 0,
+                        sqrtPriceLimitX96 : 0
+                    }
+
+                    await contract.setFeeProtocol(4, 5)
+                    await factoryContract.setOwner(controllerContract.address)
+
+                    await routerContract.connect(eric).exactInputSingle(swapParams)
+
+                    // The fee is 0.1 MONE in token0 and 0 in token1
+                    // The protocol fee is 4, i.e. 25%
+                    // So we are expecting 0.1 MONE / 4 = 0.025 MONE token0 and 0 token1
+                    const expectedFee = MONE.div(10).div(4)
+
+                    const protocolFees = await contract.protocolFees()
+                    expect(protocolFees.token0).to.equal(expectedFee)
+                    expect(protocolFees.token1).to.equal(0)
+
+                    const UINT128_MAX = BigNumber.from(2).pow(128).sub(1)
+                    await controllerContract.connect(dan).collectProtocolFees(contract.address, UINT128_MAX, UINT128_MAX)
+
+                    // Alice has 10% of the shares
+                    await checkQuery('balanceOf', [alice.address, TOKEN_0], [expectedFee.div(10).add(1)], controllerContract)
+                    await checkQuery('balanceOf', [alice.address, TOKEN_1], [0], controllerContract)
+
+                    // Bob has 20% of the shares
+                    await checkQuery('balanceOf', [bob.address, TOKEN_0], [expectedFee.div(10).mul(2).sub(1)], controllerContract)
+                    await checkQuery('balanceOf', [bob.address, TOKEN_1], [0], controllerContract)
+
+                    // Charlie has 70% of the shares
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_0], [expectedFee.div(10).mul(7).sub(1)], controllerContract)
+                    await checkQuery('balanceOf', [charlie.address, TOKEN_1], [0], controllerContract)
+                })
+                it('creates a pool', async function () {
+                    await factoryContract.setOwner(controllerContract.address)
+
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    const contractAddress = (await tx.wait()).events[1].args.pool
+
+                    contract = contractBlueprint.attach(contractAddress)
+                    
+                    // Check that it was deployed correctly
+                    await checkQuery('token0', [], [TOKEN_0], contract)
+                })
+                it('fails to create a pool without being the owner', async function () {
+                    await factoryContract.setOwner(controllerContract.address)
+
+                    const [eric] = await newUsers([])
+
+                    await expect(
+                        controllerContract.connect(eric).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
+                })
+                it('initializes a pool', async function () {
+                    await factoryContract.setOwner(controllerContract.address)
+
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    const contractAddress = (await tx.wait()).events[1].args.pool
+
+                    contract = contractBlueprint.attach(contractAddress)
+                    await controllerContract.initialize(contract.address, encodePriceSqrt(BigNumber.from(2)))
+                })
+                it('fails to initialize a pool without being the owner', async function () {
+                    await factoryContract.setOwner(controllerContract.address)
+
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    const contractAddress = (await tx.wait()).events[1].args.pool
+
+                    const [eric] = await newUsers([])
+
+                    contract = contractBlueprint.attach(contractAddress)
+                    await expect(
+                        controllerContract.connect(eric).initialize(contract.address, encodePriceSqrt(BigNumber.from(2)))
+                    ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
+                })
+                it('sets protocol fees', async function () {
+                    await factoryContract.setOwner(controllerContract.address)
+
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    const contractAddress = (await tx.wait()).events[1].args.pool
+
+                    contract = contractBlueprint.attach(contractAddress)
+                    await controllerContract.initialize(contract.address, encodePriceSqrt(BigNumber.from(2)))
+                    await controllerContract.connect(dan).setFeeProtocol(contract.address, 4, 5)
+                })
+                it('fails to set protocol fees without being the owner', async function () {
+                    await factoryContract.setOwner(controllerContract.address)
+
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    const contractAddress = (await tx.wait()).events[1].args.pool
+
+                    contract = contractBlueprint.attach(contractAddress)
+                    await controllerContract.initialize(contract.address, encodePriceSqrt(BigNumber.from(2)))
+
+                    const [eric] = await newUsers([])
+
+                    await expect(
+                        controllerContract.connect(eric).setFeeProtocol(contract.address, 4, 5)
+                    ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
+                })
             })
         })
     })
