@@ -1,5 +1,6 @@
 import { Wallet } from 'ethers'
 import { ethers } from 'hardhat'
+import { expect } from 'chai'
 
 import { poolFixture } from './shared/fixtures'
 
