@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.7.6;
-
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
+pragma abicoder v2;
 
 import './NoDelegateCall.sol';
 
@@ -20,14 +19,17 @@ import '@uniswap/v3-core/contracts/libraries/LiquidityMath.sol';
 import '@uniswap/v3-core/contracts/libraries/SqrtPriceMath.sol';
 import '@uniswap/v3-core/contracts/libraries/SwapMath.sol';
 
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3PoolDeployer.sol';
+import './interfaces/IVinuSwapPoolDeployer.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IERC20Minimal.sol';
 import '@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3MintCallback.sol';
 import '@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol';
 import '@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3FlashCallback.sol';
 
-contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
+import './interfaces/IVinuSwapPool.sol';
+import './interfaces/IFeeManager.sol';
+
+contract VinuSwapPool is IVinuSwapPool, NoDelegateCall {
     using LowGasSafeMath for uint256;
     using LowGasSafeMath for int256;
     using SafeCast for uint256;
@@ -52,6 +54,8 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
 
     /// @inheritdoc IUniswapV3PoolImmutables
     uint128 public immutable override maxLiquidityPerTick;
+
+    address public immutable feeManager;
 
     struct Slot0 {
         // the current price
@@ -116,7 +120,7 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
 
     constructor() {
         int24 _tickSpacing;
-        (factory, token0, token1, fee, _tickSpacing) = IUniswapV3PoolDeployer(msg.sender).parameters();
+        (factory, token0, token1, fee, _tickSpacing, feeManager) = IVinuSwapPoolDeployer(msg.sender).parameters();
         tickSpacing = _tickSpacing;
 
         maxLiquidityPerTick = Tick.tickSpacingToMaxLiquidityPerTick(_tickSpacing);
@@ -251,7 +255,7 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
             );
     }
 
-    /// @inheritdoc IUniswapV3PoolActions
+    /// @inheritdoc IVinuSwapPoolActions
     function increaseObservationCardinalityNext(uint16 observationCardinalityNext)
         external
         override
@@ -266,7 +270,7 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
             emit IncreaseObservationCardinalityNext(observationCardinalityNextOld, observationCardinalityNextNew);
     }
 
-    /// @inheritdoc IUniswapV3PoolActions
+    /// @inheritdoc IVinuSwapPoolActions
     /// @dev not locked because it initializes unlocked
     function initialize(uint160 sqrtPriceX96) external override {
         require(slot0.sqrtPriceX96 == 0, 'AI');
@@ -452,7 +456,7 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
         }
     }
 
-    /// @inheritdoc IUniswapV3PoolActions
+    /// @inheritdoc IVinuSwapPoolActions
     /// @dev noDelegateCall is applied indirectly via _modifyPosition
     function mint(
         address recipient,
@@ -486,7 +490,7 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
         emit Mint(msg.sender, recipient, tickLower, tickUpper, amount, amount0, amount1);
     }
 
-    /// @inheritdoc IUniswapV3PoolActions
+    /// @inheritdoc IVinuSwapPoolActions
     function collect(
         address recipient,
         int24 tickLower,
@@ -512,7 +516,7 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
         emit Collect(msg.sender, recipient, tickLower, tickUpper, amount0, amount1);
     }
 
-    /// @inheritdoc IUniswapV3PoolActions
+    /// @inheritdoc IVinuSwapPoolActions
     /// @dev noDelegateCall is applied indirectly via _modifyPosition
     function burn(
         int24 tickLower,
@@ -592,7 +596,7 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
         uint256 feeAmount;
     }
 
-    /// @inheritdoc IUniswapV3PoolActions
+    /// @inheritdoc IVinuSwapPoolActions
     function swap(
         address recipient,
         bool zeroForOne,
@@ -659,16 +663,22 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
             // get the price for the next tick
             step.sqrtPriceNextX96 = TickMath.getSqrtRatioAtTick(step.tickNext);
 
-            // compute values to swap to the target tick, price limit, or point where input/output amount is exhausted
-            (state.sqrtPriceX96, step.amountIn, step.amountOut, step.feeAmount) = SwapMath.computeSwapStep(
-                state.sqrtPriceX96,
-                (zeroForOne ? step.sqrtPriceNextX96 < sqrtPriceLimitX96 : step.sqrtPriceNextX96 > sqrtPriceLimitX96)
-                    ? sqrtPriceLimitX96
-                    : step.sqrtPriceNextX96,
-                state.liquidity,
-                state.amountSpecifiedRemaining,
-                fee
-            );
+            {
+                uint24 actualFee = IFeeManager(feeManager).computeFee(fee);
+
+                require(actualFee <= fee, 'IFV'); // invalid fee value
+
+                // compute values to swap to the target tick, price limit, or point where input/output amount is exhausted
+                (state.sqrtPriceX96, step.amountIn, step.amountOut, step.feeAmount) = SwapMath.computeSwapStep(
+                    state.sqrtPriceX96,
+                    (zeroForOne ? step.sqrtPriceNextX96 < sqrtPriceLimitX96 : step.sqrtPriceNextX96 > sqrtPriceLimitX96)
+                        ? sqrtPriceLimitX96
+                        : step.sqrtPriceNextX96,
+                    state.liquidity,
+                    state.amountSpecifiedRemaining,
+                    actualFee
+                );
+            }
 
             if (exactInput) {
                 state.amountSpecifiedRemaining -= (step.amountIn + step.feeAmount).toInt256();
@@ -785,52 +795,6 @@ contract VinuSwapPool is IUniswapV3Pool, NoDelegateCall {
 
         emit Swap(msg.sender, recipient, amount0, amount1, state.sqrtPriceX96, state.liquidity, state.tick);
         slot0.unlocked = true;
-    }
-
-    /// @inheritdoc IUniswapV3PoolActions
-    function flash(
-        address recipient,
-        uint256 amount0,
-        uint256 amount1,
-        bytes calldata data
-    ) external override lock noDelegateCall {
-        uint128 _liquidity = liquidity;
-        require(_liquidity > 0, 'L');
-
-        uint256 fee0 = FullMath.mulDivRoundingUp(amount0, fee, 1e6);
-        uint256 fee1 = FullMath.mulDivRoundingUp(amount1, fee, 1e6);
-        uint256 balance0Before = balance0();
-        uint256 balance1Before = balance1();
-
-        if (amount0 > 0) TransferHelper.safeTransfer(token0, recipient, amount0);
-        if (amount1 > 0) TransferHelper.safeTransfer(token1, recipient, amount1);
-
-        IUniswapV3FlashCallback(msg.sender).uniswapV3FlashCallback(fee0, fee1, data);
-
-        uint256 balance0After = balance0();
-        uint256 balance1After = balance1();
-
-        require(balance0Before.add(fee0) <= balance0After, 'F0');
-        require(balance1Before.add(fee1) <= balance1After, 'F1');
-
-        // sub is safe because we know balanceAfter is gt balanceBefore by at least fee
-        uint256 paid0 = balance0After - balance0Before;
-        uint256 paid1 = balance1After - balance1Before;
-
-        if (paid0 > 0) {
-            uint8 feeProtocol0 = slot0.feeProtocol % 16;
-            uint256 fees0 = feeProtocol0 == 0 ? 0 : paid0 / feeProtocol0;
-            if (uint128(fees0) > 0) protocolFees.token0 += uint128(fees0);
-            feeGrowthGlobal0X128 += FullMath.mulDiv(paid0 - fees0, FixedPoint128.Q128, _liquidity);
-        }
-        if (paid1 > 0) {
-            uint8 feeProtocol1 = slot0.feeProtocol >> 4;
-            uint256 fees1 = feeProtocol1 == 0 ? 0 : paid1 / feeProtocol1;
-            if (uint128(fees1) > 0) protocolFees.token1 += uint128(fees1);
-            feeGrowthGlobal1X128 += FullMath.mulDiv(paid1 - fees1, FixedPoint128.Q128, _liquidity);
-        }
-
-        emit Flash(msg.sender, recipient, amount0, amount1, paid0, paid1);
     }
 
     /// @inheritdoc IUniswapV3PoolOwnerActions
