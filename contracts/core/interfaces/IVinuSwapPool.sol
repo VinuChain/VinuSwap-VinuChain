@@ -6,6 +6,7 @@ import '@uniswap/v3-core/contracts/interfaces/pool/IUniswapV3PoolState.sol';
 import '@uniswap/v3-core/contracts/interfaces/pool/IUniswapV3PoolDerivedState.sol';
 import './IVinuSwapPoolActions.sol';
 import '@uniswap/v3-core/contracts/interfaces/pool/IUniswapV3PoolOwnerActions.sol';
+import './IVinuSwapExtraPoolOwnerActions.sol';
 import './IVinuSwapPoolEvents.sol';
 
 /// @title The interface for a Uniswap V3 Pool
@@ -18,6 +19,7 @@ interface IVinuSwapPool is
     IUniswapV3PoolDerivedState,
     IVinuSwapPoolActions,
     IUniswapV3PoolOwnerActions,
+    IVinuSwapExtraPoolOwnerActions,
     IVinuSwapPoolEvents
 {
 

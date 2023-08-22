@@ -270,9 +270,9 @@ contract VinuSwapPool is IVinuSwapPool, NoDelegateCall {
             emit IncreaseObservationCardinalityNext(observationCardinalityNextOld, observationCardinalityNextNew);
     }
 
-    /// @inheritdoc IVinuSwapPoolActions
+    /// @inheritdoc IVinuSwapExtraPoolOwnerActions
     /// @dev not locked because it initializes unlocked
-    function initialize(uint160 sqrtPriceX96) external override {
+    function initialize(uint160 sqrtPriceX96) external override onlyFactoryOwner {
         require(slot0.sqrtPriceX96 == 0, 'AI');
 
         int24 tick = TickMath.getTickAtSqrtRatio(sqrtPriceX96);
