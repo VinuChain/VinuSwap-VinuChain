@@ -35,7 +35,8 @@ contract VinuSwapFactory is IVinuSwapFactory, VinuSwapPoolDeployer, NoDelegateCa
     function createPool(
         address tokenA,
         address tokenB,
-        uint24 fee
+        uint24 fee,
+        address feeManager
     ) external override noDelegateCall returns (address pool) {
         require(tokenA != tokenB);
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
@@ -43,11 +44,11 @@ contract VinuSwapFactory is IVinuSwapFactory, VinuSwapPoolDeployer, NoDelegateCa
         int24 tickSpacing = feeAmountTickSpacing[fee];
         require(tickSpacing != 0);
         require(getPool[token0][token1][fee] == address(0));
-        pool = deploy(address(this), token0, token1, fee, tickSpacing);
+        pool = deploy(address(this), token0, token1, fee, tickSpacing, feeManager);
         getPool[token0][token1][fee] = pool;
         // populate mapping in the reverse direction, deliberate choice to avoid the cost of comparing addresses
         getPool[token1][token0][fee] = pool;
-        emit PoolCreated(token0, token1, fee, tickSpacing, pool);
+        emit PoolCreated(token0, token1, fee, tickSpacing, feeManager, pool);
     }
 
     /// @inheritdoc IVinuSwapFactory

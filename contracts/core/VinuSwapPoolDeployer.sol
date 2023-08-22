@@ -11,6 +11,7 @@ contract VinuSwapPoolDeployer is IVinuSwapPoolDeployer {
     address internal _token1;
     uint24 internal _fee;
     int24 internal _tickSpacing;
+    address internal _feeManager;
 
     function parameters() public view override returns (address factory, address token0, address token1, uint24 fee, int24 tickSpacing, address feeManager) {
         factory = _factory;
@@ -18,6 +19,7 @@ contract VinuSwapPoolDeployer is IVinuSwapPoolDeployer {
         token1 = _token1;
         fee = _fee;
         tickSpacing = _tickSpacing;
+        feeManager = _feeManager;
     }
 
     /// @dev Deploys a pool with the given parameters by transiently setting the parameters storage slot and then
@@ -32,13 +34,16 @@ contract VinuSwapPoolDeployer is IVinuSwapPoolDeployer {
         address token0,
         address token1,
         uint24 fee,
-        int24 tickSpacing
+        int24 tickSpacing,
+        address feeManager
     ) internal returns (address pool) {
         _factory = factory;
         _token0 = token0;
         _token1 = token1;
         _fee = fee;
         _tickSpacing = tickSpacing;
+        _feeManager = feeManager;
+        
         pool = address(new VinuSwapPool{salt: keccak256(abi.encode(token0, token1, fee))}());
     }
 }
