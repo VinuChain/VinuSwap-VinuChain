@@ -55,7 +55,7 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @param feeProtocol1 The updated value of the token1 protocol fee
     event SetFeeProtocol(address indexed pool, uint8 feeProtocol0, uint8 feeProtocol1);
 
-    event Initialized(address indexed pool, uint160 sqrtPriceX96);
+    event Initialize(address indexed pool, uint160 sqrtPriceX96);
 
     mapping(address => mapping(address => uint256)) internal _balances;
 
@@ -166,7 +166,7 @@ contract Controller is Ownable, ReentrancyGuard {
 
     function initialize(address pool, uint160 sqrtPriceX96) external onlyOwner {
         IVinuSwapExtraPoolOwnerActions(pool).initialize(sqrtPriceX96);
-        emit Initialized(pool, sqrtPriceX96);
+        emit Initialize(pool, sqrtPriceX96);
     }
 
     function withdraw(address token, uint256 amount) external {
