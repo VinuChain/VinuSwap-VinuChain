@@ -4,11 +4,6 @@ pragma solidity >=0.5.0;
 /// @title Permissionless pool actions
 /// @notice Contains pool methods that can be called by anyone
 interface IVinuSwapPoolActions {
-    /// @notice Sets the initial price for the pool
-    /// @dev Price is represented as a sqrt(amountToken1/amountToken0) Q64.96 value
-    /// @param sqrtPriceX96 the initial sqrt price of the pool as a Q64.96
-    function initialize(uint160 sqrtPriceX96) external;
-
     /// @notice Adds liquidity for the given recipient/tickLower/tickUpper position
     /// @dev The caller of this method receives a callback in the form of IUniswapV3MintCallback#uniswapV3MintCallback
     /// in which they must pay any token0 or token1 owed for the liquidity. The amount of token0/token1 due depends
