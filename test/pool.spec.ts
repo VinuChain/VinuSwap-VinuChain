@@ -18,6 +18,8 @@ const expect = chai.expect
 
 let deployer: any
 
+let tieredDiscountBlueprint : hre.ethers.ContractFactory
+let noDiscountBlueprint : hre.ethers.ContractFactory
 let factoryBlueprint : hre.ethers.ContractFactory
 let contractBlueprint: ethers.ContractFactory
 let routerBlueprint : hre.ethers.ContractFactory
@@ -25,6 +27,8 @@ let nftDescriptorLibraryBlueprint : hre.ethers.ContractFactory
 let positionDescriptorBlueprint : hre.ethers.ContractFactory
 let positionManagerBlueprint : hre.ethers.ContractFactory
 
+let erc20Blueprint : hre.ethers.ContractFactory
+let noDiscountContract : any
 let factoryContract : any
 let contract: any
 let routerContract : any
@@ -48,8 +52,6 @@ let WETH : string
 
 let token0Contract : any
 let token1Contract : any
-
-
 
 bn.config({ EXPONENTIAL_AT: 999999, DECIMAL_PLACES: 40 }) 
 function encodePriceSqrt(ratio : BigNumber){
@@ -211,7 +213,7 @@ describe('test BasePool', function () {
         deployer = a
         console.log('Signer created.')
 
-        const erc20Blueprint = await hre.ethers.getContractFactory('MockERC20')
+        erc20Blueprint = await hre.ethers.getContractFactory('MockERC20')
 
         token0Contract = await erc20Blueprint.deploy()
         TOKEN_0 = token0Contract.address
@@ -228,14 +230,19 @@ describe('test BasePool', function () {
         console.log('Deployed ERC20s.')
 
 
-        await token0Contract.connect(deployer).mint('1000000')
-        await token1Contract.connect(deployer).mint('1000000')
+        await token0Contract.connect(deployer).mint(MONE.mul(MONE))
+        await token1Contract.connect(deployer).mint(MONE.mul(MONE))
 
         console.log('Compiling contracts...')
 
+        // Note: PoolInitHelper must be compiled with the exact same settings
+        // (including optimization runs) as the factory
         const poolInitHelperBlueprint = await hre.ethers.getContractFactory('PoolInitHelper')
         const poolInitHelperContract = await poolInitHelperBlueprint.deploy()
         console.log('Init code hash:', await poolInitHelperContract.getInitCodeHash())
+
+        tieredDiscountBlueprint = await hre.ethers.getContractFactory('TieredDiscount')
+        noDiscountBlueprint = await hre.ethers.getContractFactory('NoDiscount')
 
         factoryBlueprint = await hre.ethers.getContractFactory('VinuSwapFactory')
 
@@ -263,13 +270,11 @@ describe('test BasePool', function () {
 
             expect(factoryContract.address).to.be.a('string')
 
-            // TODO: What are the parameters?
             await factoryContract.enableFeeAmount(FEE, TICK_SPACING)
 
-
-            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE)
+            noDiscountContract = await noDiscountBlueprint.deploy()
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, noDiscountContract.address)
             const contractAddress = (await tx.wait()).events[0].args.pool
-            console.log('Contract address: ', contractAddress)
 
             contract = contractBlueprint.attach(contractAddress)
 
@@ -289,7 +294,6 @@ describe('test BasePool', function () {
                 WETH,
                 positionDescriptorContract.address
             )
-            console.log('Deployed position manager.')
         })
     })
 
@@ -299,13 +303,11 @@ describe('test BasePool', function () {
 
             expect(factoryContract.address).to.be.a('string')
 
-            // TODO: What are the parameters?
             await factoryContract.enableFeeAmount(FEE, TICK_SPACING)
 
-
-            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE)
+            noDiscountContract = await noDiscountBlueprint.deploy()
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, noDiscountContract.address)
             const contractAddress = (await tx.wait()).events[0].args.pool
-            console.log('Contract address: ', contractAddress)
 
             contract = contractBlueprint.attach(contractAddress)
 
@@ -323,7 +325,6 @@ describe('test BasePool', function () {
                 WETH,
                 positionDescriptorContract.address
             )
-            console.log('Deployed position manager.')
         })
 
         describe('sanity checks', function () {
@@ -608,7 +609,7 @@ describe('test BasePool', function () {
             })
         })
 
-        describe.only('locking', function () {
+        describe('locking', function () {
             it('locks a position', async function () {
                 await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
@@ -906,5 +907,434 @@ describe('test BasePool', function () {
             
         })
 
+    })
+
+    describe('fee tiers', function () {
+        const FEE_TIER_FEE = 100000 // 10%
+        const FEE_TIER_TICK_SPACING = 1
+
+        beforeEach(async function () {
+            factoryContract = await factoryBlueprint.deploy()
+
+            expect(factoryContract.address).to.be.a('string')
+
+            await factoryContract.enableFeeAmount(FEE_TIER_FEE, FEE_TIER_TICK_SPACING)
+        })
+
+        it('checks that the output of computeFee is used correctly (with no discount)', async function () {
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, (await noDiscountBlueprint.deploy()).address)
+            const contractAddress = (await tx.wait()).events[0].args.pool
+
+            contract = contractBlueprint.attach(contractAddress)
+
+            expect(contract.address).to.be.a('string')
+
+            routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
+
+            positionDescriptorContract = await positionDescriptorBlueprint.deploy(
+                WETH,
+                hre.ethers.utils.formatBytes32String('VinuSwap Position')
+            )
+
+            positionManagerContract = await positionManagerBlueprint.deploy(
+                factoryContract.address,
+                WETH,
+                positionDescriptorContract.address
+            )
+
+            const [alice] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
+            await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+            const mintParams = {
+                token0 : TOKEN_0,
+                token1 : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                tickLower : -887272,
+                tickUpper : 887272,
+                amount0Desired : MONE.mul(1000),
+                amount1Desired : MONE.mul(2000),
+                amount0Min : 0,
+                amount1Min : 0,
+                recipient : deployer.address,
+                deadline : await time.latest() + 1000000
+            }
+
+            await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+            await token1Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(3000))
+            await positionManagerContract.connect(deployer).mint(mintParams)
+
+            await token0Contract.connect(alice).approve(routerContract.address, MONE)
+
+            const swapParams = {
+                tokenIn : TOKEN_0,
+                tokenOut : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                recipient : alice.address,
+                deadline : await time.latest() + 1000000,
+                amountIn : MONE,
+                amountOutMinimum : 0,
+                sqrtPriceLimitX96 : 0
+            }
+
+            await routerContract.connect(alice).exactInputSingle(swapParams)
+
+            // Collect the fees
+
+            const collectParams = {
+                tokenId : 1,
+                recipient : deployer.address,
+                amount0Max : BigNumber.from(2).pow(128).sub(1),
+                amount1Max : BigNumber.from(2).pow(128).sub(1)
+            }
+
+            const initialToken0Balance = await token0Contract.balanceOf(deployer.address)
+            const initialToken1Balance = await token1Contract.balanceOf(deployer.address)
+            await positionManagerContract.connect(deployer).collect(collectParams)
+
+            const finalToken0Balance = await token0Contract.balanceOf(deployer.address)
+            const finalToken1Balance = await token1Contract.balanceOf(deployer.address)
+
+            const token0Amount = finalToken0Balance.sub(initialToken0Balance)
+            const token1Amount = finalToken1Balance.sub(initialToken1Balance)
+
+            // 10^17, aka 0.1 MONE (which corresponds to the fee). The missing 1 wei is due to rounding
+            expect(token0Amount.toString()).to.be.equal('99999999999999999')
+            expect(token1Amount.toString()).to.be.equal('0')
+        })
+
+        it('checks that the output of computeFee is used correctly (with 50% discount)', async function () {
+            const halfDiscountBlueprint = await hre.ethers.getContractFactory('HalfDiscount')
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, (await halfDiscountBlueprint.deploy()).address)
+            const contractAddress = (await tx.wait()).events[0].args.pool
+
+            contract = contractBlueprint.attach(contractAddress)
+
+            expect(contract.address).to.be.a('string')
+
+            routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
+
+            positionDescriptorContract = await positionDescriptorBlueprint.deploy(
+                WETH,
+                hre.ethers.utils.formatBytes32String('VinuSwap Position')
+            )
+
+            positionManagerContract = await positionManagerBlueprint.deploy(
+                factoryContract.address,
+                WETH,
+                positionDescriptorContract.address
+            )
+
+            const [alice] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
+            await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+            const mintParams = {
+                token0 : TOKEN_0,
+                token1 : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                tickLower : -887272,
+                tickUpper : 887272,
+                amount0Desired : MONE.mul(1000),
+                amount1Desired : MONE.mul(2000),
+                amount0Min : 0,
+                amount1Min : 0,
+                recipient : deployer.address,
+                deadline : await time.latest() + 1000000
+            }
+
+            await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+            await token1Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(3000))
+            await positionManagerContract.connect(deployer).mint(mintParams)
+
+            await token0Contract.connect(alice).approve(routerContract.address, MONE)
+
+            const swapParams = {
+                tokenIn : TOKEN_0,
+                tokenOut : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                recipient : alice.address,
+                deadline : await time.latest() + 1000000,
+                amountIn : MONE,
+                amountOutMinimum : 0,
+                sqrtPriceLimitX96 : 0
+            }
+
+            await routerContract.connect(alice).exactInputSingle(swapParams)
+
+            // Collect the fees
+
+            const collectParams = {
+                tokenId : 1,
+                recipient : deployer.address,
+                amount0Max : BigNumber.from(2).pow(128).sub(1),
+                amount1Max : BigNumber.from(2).pow(128).sub(1)
+            }
+
+            const initialToken0Balance = await token0Contract.balanceOf(deployer.address)
+            const initialToken1Balance = await token1Contract.balanceOf(deployer.address)
+            await positionManagerContract.connect(deployer).collect(collectParams)
+
+            const finalToken0Balance = await token0Contract.balanceOf(deployer.address)
+            const finalToken1Balance = await token1Contract.balanceOf(deployer.address)
+
+            const token0Amount = finalToken0Balance.sub(initialToken0Balance)
+            const token1Amount = finalToken1Balance.sub(initialToken1Balance)
+
+            // 5 * 10^16, aka 0.05 MONE (which corresponds to the fee). The missing 1 wei is due to rounding
+            expect(token0Amount.toString()).to.be.equal('49999999999999999')
+            expect(token1Amount.toString()).to.be.equal('0')
+        })
+
+        it('checks that the output of computeFee is used correctly (with 100% discount)', async function () {
+            const fixedFeeBlueprint = await hre.ethers.getContractFactory('FixedFee')
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, (await fixedFeeBlueprint.deploy(0)).address)
+            const contractAddress = (await tx.wait()).events[0].args.pool
+
+            contract = contractBlueprint.attach(contractAddress)
+
+            expect(contract.address).to.be.a('string')
+
+            routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
+
+            positionDescriptorContract = await positionDescriptorBlueprint.deploy(
+                WETH,
+                hre.ethers.utils.formatBytes32String('VinuSwap Position')
+            )
+
+            positionManagerContract = await positionManagerBlueprint.deploy(
+                factoryContract.address,
+                WETH,
+                positionDescriptorContract.address
+            )
+
+            const [alice] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
+            await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+            const mintParams = {
+                token0 : TOKEN_0,
+                token1 : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                tickLower : -887272,
+                tickUpper : 887272,
+                amount0Desired : MONE.mul(1000),
+                amount1Desired : MONE.mul(2000),
+                amount0Min : 0,
+                amount1Min : 0,
+                recipient : deployer.address,
+                deadline : await time.latest() + 1000000
+            }
+
+            await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+            await token1Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(3000))
+            await positionManagerContract.connect(deployer).mint(mintParams)
+
+            await token0Contract.connect(alice).approve(routerContract.address, MONE)
+
+            const swapParams = {
+                tokenIn : TOKEN_0,
+                tokenOut : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                recipient : alice.address,
+                deadline : await time.latest() + 1000000,
+                amountIn : MONE,
+                amountOutMinimum : 0,
+                sqrtPriceLimitX96 : 0
+            }
+
+            await routerContract.connect(alice).exactInputSingle(swapParams)
+
+            // Collect the fees
+
+            const collectParams = {
+                tokenId : 1,
+                recipient : deployer.address,
+                amount0Max : BigNumber.from(2).pow(128).sub(1),
+                amount1Max : BigNumber.from(2).pow(128).sub(1)
+            }
+
+            const initialToken0Balance = await token0Contract.balanceOf(deployer.address)
+            const initialToken1Balance = await token1Contract.balanceOf(deployer.address)
+            await positionManagerContract.connect(deployer).collect(collectParams)
+
+            const finalToken0Balance = await token0Contract.balanceOf(deployer.address)
+            const finalToken1Balance = await token1Contract.balanceOf(deployer.address)
+
+            const token0Amount = finalToken0Balance.sub(initialToken0Balance)
+            const token1Amount = finalToken1Balance.sub(initialToken1Balance)
+
+            // No fees collected
+            expect(token0Amount.toString()).to.be.equal('0')
+            expect(token1Amount.toString()).to.be.equal('0')
+        })
+
+
+        it('fails to use a fee that is higher than the original', async function () {
+            const fixedFeeBlueprint = await hre.ethers.getContractFactory('FixedFee')
+            // 10.0001%
+            const fixedFeeContract = await fixedFeeBlueprint.deploy(FEE_TIER_FEE + 1)
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, fixedFeeContract.address)
+            const contractAddress = (await tx.wait()).events[0].args.pool
+
+            contract = contractBlueprint.attach(contractAddress)
+
+            expect(contract.address).to.be.a('string')
+
+            routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
+
+            positionDescriptorContract = await positionDescriptorBlueprint.deploy(
+                WETH,
+                hre.ethers.utils.formatBytes32String('VinuSwap Position')
+            )
+
+            positionManagerContract = await positionManagerBlueprint.deploy(
+                factoryContract.address,
+                WETH,
+                positionDescriptorContract.address
+            )
+
+            const [alice] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
+            await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+            const mintParams = {
+                token0 : TOKEN_0,
+                token1 : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                tickLower : -887272,
+                tickUpper : 887272,
+                amount0Desired : MONE.mul(1000),
+                amount1Desired : MONE.mul(2000),
+                amount0Min : 0,
+                amount1Min : 0,
+                recipient : deployer.address,
+                deadline : await time.latest() + 1000000
+            }
+
+            console.log(MONE)
+            console.log(FEE_TIER_FEE)
+
+            await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+            await token1Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(3000))
+            await positionManagerContract.connect(deployer).mint(mintParams)
+
+            await token0Contract.connect(alice).approve(routerContract.address, MONE)
+
+            const swapParams = {
+                tokenIn : TOKEN_0,
+                tokenOut : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                recipient : alice.address,
+                deadline : await time.latest() + 1000000,
+                amountIn : MONE,
+                amountOutMinimum : 0,
+                sqrtPriceLimitX96 : 0
+            }
+
+            // Note: for some reason, hardhat cannot generate a stacktrace for this error
+            // Still, the call fails correctly
+            await expect(
+                routerContract.connect(alice).exactInputSingle(swapParams)
+            ).to.be.eventually.rejectedWith('IFV')
+        })
+
+        it('correctly computes the fee tier', async function () {
+            // We will always assuma a base fee of 5000, i.e. 0.5%
+            const discountTokenContract = await erc20Blueprint.deploy()
+
+            const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                discountTokenContract.address,
+                [100, 200, 300],
+                [1000, 2000, 3000]
+            )
+
+            // No tokens: 0% discount
+            await checkQuery('computeFeeFor', [5000, deployer.address], [5000], tieredDiscountContract)
+
+            await discountTokenContract.connect(deployer).mint(99)
+
+            // Still not enough: 0% discount
+            await checkQuery('computeFeeFor', [5000, deployer.address], [5000], tieredDiscountContract)
+
+            await discountTokenContract.connect(deployer).mint(1)
+            // Now we have 100 tokens: 10% discount
+            await checkQuery('computeFeeFor', [5000, deployer.address], [4500], tieredDiscountContract)
+
+            await discountTokenContract.connect(deployer).mint(100)
+            // Now we have 200 tokens: 20% discount
+            await checkQuery('computeFeeFor', [5000, deployer.address], [4000], tieredDiscountContract)
+
+            await discountTokenContract.connect(deployer).mint(100)
+            // Now we have 300 tokens: 30% discount
+            await checkQuery('computeFeeFor', [5000, deployer.address], [3500], tieredDiscountContract)
+
+            await discountTokenContract.connect(deployer).mint(100)
+            // Now we have 400 tokens: still 30% discount
+            await checkQuery('computeFeeFor', [5000, deployer.address], [3500], tieredDiscountContract)
+        })
+
+        it('correctly handles a 0% discount', async function () {
+            const discountTokenContract = await erc20Blueprint.deploy()
+
+            const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                discountTokenContract.address,
+                [100],
+                [0]
+            )
+
+            await discountTokenContract.connect(deployer).mint(150)
+            await checkQuery('computeFeeFor', [5000, deployer.address], [5000], tieredDiscountContract)
+        })
+
+        it('correctly handles a 100% discount', async function () {
+            const discountTokenContract = await erc20Blueprint.deploy()
+
+            const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                discountTokenContract.address,
+                [100],
+                [10000]
+            )
+
+            await discountTokenContract.connect(deployer).mint(150)
+            await checkQuery('computeFeeFor', [5000, deployer.address], [0], tieredDiscountContract)
+        })
+
+        it('fails to deploy a tiered fee manager with 0 tiers', async function () {
+            const discountTokenContract = await erc20Blueprint.deploy()
+            
+            await expect(
+                tieredDiscountBlueprint.deploy(discountTokenContract.address, [], [])
+            ).to.be.rejectedWith('Thresholds must not be empty')
+        })
+
+        it('fails to deploy a tiered fee manager with different parameter lengths', async function () {
+            const discountTokenContract = await erc20Blueprint.deploy()
+            
+            await expect(
+                tieredDiscountBlueprint.deploy(discountTokenContract.address, [100, 200], [1000])
+            ).to.be.rejectedWith('Thresholds and discounts must have the same length')
+        })
+
+        it('fails to deploy a tiered fee manager with non-increasing thresholds', async function () {
+            const discountTokenContract = await erc20Blueprint.deploy()
+            
+            await expect(
+                tieredDiscountBlueprint.deploy(discountTokenContract.address, [100, 100, 101], [100, 200, 300])
+            ).to.be.rejectedWith('Thresholds must be strictly increasing')
+        })
+
+        it('fails to deploy a tiered fee manager with non-increasing discounts', async function () {
+            const discountTokenContract = await erc20Blueprint.deploy()
+            
+            await expect(
+                tieredDiscountBlueprint.deploy(discountTokenContract.address, [100, 200, 300], [100, 100, 101])
+            ).to.be.rejectedWith('Discounts must be strictly increasing')
+        })
+
+        it('fails to deploy a tiered fee manager with a discount that is too high', async function () {
+            const discountTokenContract = await erc20Blueprint.deploy()
+            
+            // 100.01% discount
+            await expect(
+                tieredDiscountBlueprint.deploy(discountTokenContract.address, [100], [10001])
+            ).to.be.rejectedWith('Thresholds must be strictly increasing')
+        })
     })
 })
