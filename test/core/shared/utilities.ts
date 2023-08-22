@@ -1,9 +1,6 @@
 import bn from 'bignumber.js'
 import { BigNumber, BigNumberish, constants, Contract, ContractTransaction, utils, Wallet } from 'ethers'
-import { TestUniswapV3Callee } from '../../typechain/TestUniswapV3Callee'
-import { TestUniswapV3Router } from '../../typechain/TestUniswapV3Router'
-import { MockTimeUniswapV3Pool } from '../../typechain/MockTimeUniswapV3Pool'
-import { TestERC20 } from '../../typechain/TestERC20'
+
 
 export const MaxUint128 = BigNumber.from(2).pow(128).sub(1)
 
@@ -110,10 +107,10 @@ export function createPoolFunctions({
   token1,
   pool,
 }: {
-  swapTarget: TestUniswapV3Callee
-  token0: TestERC20
-  token1: TestERC20
-  pool: MockTimeUniswapV3Pool
+  swapTarget: any
+  token0: any
+  token1: any
+  pool: any
 }): PoolFunctions {
   async function swapToSqrtPrice(
     inputToken: Contract,
@@ -232,10 +229,10 @@ export function createMultiPoolFunctions({
   poolInput,
   poolOutput,
 }: {
-  inputToken: TestERC20
-  swapTarget: TestUniswapV3Router
-  poolInput: MockTimeUniswapV3Pool
-  poolOutput: MockTimeUniswapV3Pool
+  inputToken: any
+  swapTarget: any
+  poolInput: any
+  poolOutput: any
 }): MultiPoolFunctions {
   async function swapForExact0Multi(amountOut: BigNumberish, to: Wallet | string): Promise<ContractTransaction> {
     const method = swapTarget.swapForExact0Multi

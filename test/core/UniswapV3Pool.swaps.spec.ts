@@ -1,11 +1,6 @@
 import { Decimal } from 'decimal.js'
 import { BigNumber, BigNumberish, ContractTransaction, Wallet } from 'ethers'
-import { ethers, waffle } from 'hardhat'
-import { MockTimeUniswapV3Pool } from '../typechain/MockTimeUniswapV3Pool'
-import { TestERC20 } from '../typechain/TestERC20'
-
-import { TestUniswapV3Callee } from '../typechain/TestUniswapV3Callee'
-import { expect } from './shared/expect'
+import { ethers } from 'hardhat'
 import { poolFixture } from './shared/fixtures'
 import { formatPrice, formatTokenAmount } from './shared/format'
 import {
@@ -24,7 +19,6 @@ import {
 
 Decimal.config({ toExpNeg: -500, toExpPos: 500 })
 
-const createFixtureLoader = waffle.createFixtureLoader
 const { constants } = ethers
 
 interface BaseSwapTestCase {
@@ -103,7 +97,7 @@ const SWAP_RECIPIENT_ADDRESS = constants.AddressZero.slice(0, -1) + '1'
 const POSITION_PROCEEDS_OUTPUT_ADDRESS = constants.AddressZero.slice(0, -1) + '2'
 
 async function executeSwap(
-  pool: MockTimeUniswapV3Pool,
+  pool: any,
   testCase: SwapTestCase,
   poolFunctions: PoolFunctions
 ): Promise<ContractTransaction> {
@@ -450,21 +444,14 @@ const TEST_POOLS: PoolTestCase[] = [
 describe('UniswapV3Pool swap tests', () => {
   let wallet: Wallet, other: Wallet
 
-  let loadFixture: ReturnType<typeof createFixtureLoader>
-
   before('create fixture loader', async () => {
     ;[wallet, other] = await (ethers as any).getSigners()
-
-    loadFixture = createFixtureLoader([wallet])
   })
 
   for (const poolCase of TEST_POOLS) {
     describe(poolCase.description, () => {
       const poolCaseFixture = async () => {
-        const { createPool, token0, token1, swapTargetCallee: swapTarget } = await poolFixture(
-          [wallet],
-          waffle.provider
-        )
+        const { createPool, token0, token1, swapTargetCallee: swapTarget } = await poolFixture()
         const pool = await createPool(poolCase.feeAmount, poolCase.tickSpacing)
         const poolFunctions = createPoolFunctions({ swapTarget, token0, token1, pool })
         await pool.initialize(poolCase.startingPrice)
@@ -481,20 +468,18 @@ describe('UniswapV3Pool swap tests', () => {
         return { token0, token1, pool, poolFunctions, poolBalance0, poolBalance1, swapTarget }
       }
 
-      let token0: TestERC20
-      let token1: TestERC20
+      let token0: any
+      let token1: any
 
       let poolBalance0: BigNumber
       let poolBalance1: BigNumber
 
-      let pool: MockTimeUniswapV3Pool
-      let swapTarget: TestUniswapV3Callee
+      let pool: any
+      let swapTarget: any
       let poolFunctions: PoolFunctions
 
       beforeEach('load fixture', async () => {
-        ;({ token0, token1, pool, poolFunctions, poolBalance0, poolBalance1, swapTarget } = await loadFixture(
-          poolCaseFixture
-        ))
+        ;({ token0, token1, pool, poolFunctions, poolBalance0, poolBalance1, swapTarget } = await poolCaseFixture())
       })
 
       afterEach('check can burn positions', async () => {

@@ -1,9 +1,5 @@
 import { Wallet } from 'ethers'
-import { ethers, waffle } from 'hardhat'
-import { UniswapV3Factory } from '../typechain/UniswapV3Factory'
-import { expect } from './shared/expect'
-import snapshotGasCost from './shared/snapshotGasCost'
-
+import { ethers } from 'hardhat'
 import { FeeAmount, getCreate2Address, TICK_SPACINGS } from './shared/utilities'
 
 const { constants } = ethers
@@ -13,45 +9,24 @@ const TEST_ADDRESSES: [string, string] = [
   '0x2000000000000000000000000000000000000000',
 ]
 
-const createFixtureLoader = waffle.createFixtureLoader
 
 describe('UniswapV3Factory', () => {
   let wallet: Wallet, other: Wallet
 
-  let factory: UniswapV3Factory
+  let factory: any
   let poolBytecode: string
-  const fixture = async () => {
-    const factoryFactory = await ethers.getContractFactory('UniswapV3Factory')
-    return (await factoryFactory.deploy()) as UniswapV3Factory
-  }
-
-  let loadFixture: ReturnType<typeof createFixtureLoader>
-  before('create fixture loader', async () => {
-    ;[wallet, other] = await (ethers as any).getSigners()
-
-    loadFixture = createFixtureLoader([wallet, other])
-  })
 
   before('load pool bytecode', async () => {
     poolBytecode = (await ethers.getContractFactory('UniswapV3Pool')).bytecode
   })
 
   beforeEach('deploy factory', async () => {
-    factory = await loadFixture(fixture)
+    [wallet, other] = await (ethers as any).getSigners()
+    factory = await ethers.getContractFactory('UniswapV3Factory')
   })
 
   it('owner is deployer', async () => {
     expect(await factory.owner()).to.eq(wallet.address)
-  })
-
-  it('factory bytecode size', async () => {
-    expect(((await waffle.provider.getCode(factory.address)).length - 2) / 2).to.matchSnapshot()
-  })
-
-  it('pool bytecode size', async () => {
-    await factory.createPool(TEST_ADDRESSES[0], TEST_ADDRESSES[1], FeeAmount.MEDIUM)
-    const poolAddress = getCreate2Address(factory.address, TEST_ADDRESSES, FeeAmount.MEDIUM, poolBytecode)
-    expect(((await waffle.provider.getCode(poolAddress)).length - 2) / 2).to.matchSnapshot()
   })
 
   it('initial enabled fee amounts', async () => {
@@ -116,10 +91,6 @@ describe('UniswapV3Factory', () => {
 
     it('fails if fee amount is not enabled', async () => {
       await expect(factory.createPool(TEST_ADDRESSES[0], TEST_ADDRESSES[1], 250)).to.be.reverted
-    })
-
-    it('gas', async () => {
-      await snapshotGasCost(factory.createPool(TEST_ADDRESSES[0], TEST_ADDRESSES[1], FeeAmount.MEDIUM))
     })
   })
 

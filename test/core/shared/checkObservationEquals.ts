@@ -1,5 +1,4 @@
 import { BigNumber, BigNumberish } from 'ethers'
-import { expect } from './expect'
 
 // helper function because we cannot do a simple deep equals with the
 // observation result object returned from ethers because it extends array

@@ -1,11 +1,6 @@
-import { ethers, waffle } from 'hardhat'
+import { ethers } from 'hardhat'
 import { BigNumber, BigNumberish, constants, Wallet } from 'ethers'
-import { TestERC20 } from '../typechain/TestERC20'
-import { UniswapV3Factory } from '../typechain/UniswapV3Factory'
-import { MockTimeUniswapV3Pool } from '../typechain/MockTimeUniswapV3Pool'
-import { TestUniswapV3SwapPay } from '../typechain/TestUniswapV3SwapPay'
 import checkObservationEquals from './shared/checkObservationEquals'
-import { expect } from './shared/expect'
 
 import { poolFixture, TEST_POOL_START_TIME } from './shared/fixtures'
 
@@ -27,26 +22,20 @@ import {
   MIN_SQRT_RATIO,
   SwapToPriceFunction,
 } from './shared/utilities'
-import { TestUniswapV3Callee } from '../typechain/TestUniswapV3Callee'
-import { TestUniswapV3ReentrantCallee } from '../typechain/TestUniswapV3ReentrantCallee'
-import { TickMathTest } from '../typechain/TickMathTest'
-import { SwapMathTest } from '../typechain/SwapMathTest'
-
-const createFixtureLoader = waffle.createFixtureLoader
 
 type ThenArg<T> = T extends PromiseLike<infer U> ? U : T
 
 describe('UniswapV3Pool', () => {
   let wallet: Wallet, other: Wallet
 
-  let token0: TestERC20
-  let token1: TestERC20
-  let token2: TestERC20
+  let token0: any
+  let token1: any
+  let token2: any
 
-  let factory: UniswapV3Factory
-  let pool: MockTimeUniswapV3Pool
+  let factory: any
+  let pool: any
 
-  let swapTarget: TestUniswapV3Callee
+  let swapTarget: any
 
   let swapToLowerPrice: SwapToPriceFunction
   let swapToHigherPrice: SwapToPriceFunction
@@ -64,16 +53,14 @@ describe('UniswapV3Pool', () => {
   let mint: MintFunction
   let flash: FlashFunction
 
-  let loadFixture: ReturnType<typeof createFixtureLoader>
   let createPool: ThenArg<ReturnType<typeof poolFixture>>['createPool']
 
   before('create fixture loader', async () => {
     ;[wallet, other] = await (ethers as any).getSigners()
-    loadFixture = createFixtureLoader([wallet, other])
   })
 
   beforeEach('deploy fixture', async () => {
-    ;({ token0, token1, token2, factory, createPool, swapTargetCallee: swapTarget } = await loadFixture(poolFixture))
+    ;({ token0, token1, token2, factory, createPool, swapTargetCallee: swapTarget } = await poolFixture())
 
     const oldCreatePool = createPool
     createPool = async (_feeAmount, _tickSpacing) => {
@@ -623,7 +610,7 @@ describe('UniswapV3Pool', () => {
 
   // the combined amount of liquidity that the pool is initialized with (including the 1 minimum liquidity that is burned)
   const initializeLiquidityAmount = expandTo18Decimals(2)
-  async function initializeAtZeroTick(pool: MockTimeUniswapV3Pool): Promise<void> {
+  async function initializeAtZeroTick(pool: any): Promise<void> {
     await pool.initialize(encodePriceSqrt(1, 1))
     const tickSpacing = await pool.tickSpacing()
     const [min, max] = [getMinTick(tickSpacing), getMaxTick(tickSpacing)]
@@ -1349,8 +1336,8 @@ describe('UniswapV3Pool', () => {
   // https://github.com/Uniswap/uniswap-v3-core/issues/214
   it('tick transition cannot run twice if zero for one swap ends at fractional price just below tick', async () => {
     pool = await createPool(FeeAmount.MEDIUM, 1)
-    const sqrtTickMath = (await (await ethers.getContractFactory('TickMathTest')).deploy()) as TickMathTest
-    const swapMath = (await (await ethers.getContractFactory('SwapMathTest')).deploy()) as SwapMathTest
+    const sqrtTickMath = (await (await ethers.getContractFactory('TickMathTest')).deploy())
+    const swapMath = (await (await ethers.getContractFactory('SwapMathTest')).deploy())
     const p0 = (await sqrtTickMath.getSqrtRatioAtTick(-24081)).add(1)
     // initialize at a price of ~0.3 token1/token0
     // meaning if you swap in 2 token0, you should end up getting 0 token1
@@ -1686,7 +1673,7 @@ describe('UniswapV3Pool', () => {
     it('cannot reenter from swap callback', async () => {
       const reentrant = (await (
         await ethers.getContractFactory('TestUniswapV3ReentrantCallee')
-      ).deploy()) as TestUniswapV3ReentrantCallee
+      ).deploy())
 
       // the tests happen in solidity
       await expect(reentrant.swapToReenter(pool.address)).to.be.revertedWith('Unable to reenter')

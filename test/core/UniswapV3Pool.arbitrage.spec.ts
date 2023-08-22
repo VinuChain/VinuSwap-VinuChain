@@ -1,10 +1,6 @@
 import Decimal from 'decimal.js'
 import { BigNumber, BigNumberish, Wallet } from 'ethers'
-import { ethers, waffle } from 'hardhat'
-import { MockTimeUniswapV3Pool } from '../typechain/MockTimeUniswapV3Pool'
-import { TickMathTest } from '../typechain/TickMathTest'
-import { UniswapV3PoolSwapTest } from '../typechain/UniswapV3PoolSwapTest'
-import { expect } from './shared/expect'
+import { ethers } from 'hardhat'
 
 import { poolFixture } from './shared/fixtures'
 import { formatPrice, formatTokenAmount } from './shared/format'
@@ -29,8 +25,6 @@ const {
   constants: { MaxUint256 },
 } = ethers
 
-const createFixtureLoader = waffle.createFixtureLoader
-
 Decimal.config({ toExpNeg: -500, toExpPos: 500 })
 
 function applySqrtRatioBipsHundredthsDelta(sqrtRatio: BigNumber, bipsHundredths: number): BigNumber {
@@ -51,11 +45,8 @@ function applySqrtRatioBipsHundredthsDelta(sqrtRatio: BigNumber, bipsHundredths:
 describe('UniswapV3Pool arbitrage tests', () => {
   let wallet: Wallet, arbitrageur: Wallet
 
-  let loadFixture: ReturnType<typeof createFixtureLoader>
-
   before('create fixture loader', async () => {
     ;[wallet, arbitrageur] = await (ethers as any).getSigners()
-    loadFixture = createFixtureLoader([wallet, arbitrageur])
   })
 
   for (const feeProtocol of [0, 6]) {
@@ -75,7 +66,7 @@ describe('UniswapV3Pool arbitrage tests', () => {
       ]) {
         describe(`passive liquidity of ${formatTokenAmount(passiveLiquidity)}`, () => {
           const arbTestFixture = async ([wallet, arbitrageur]: Wallet[]) => {
-            const fix = await poolFixture([wallet], waffle.provider)
+            const fix = await poolFixture()
 
             const pool = await fix.createPool(feeAmount, tickSpacing)
 
@@ -96,10 +87,10 @@ describe('UniswapV3Pool arbitrage tests', () => {
             })
 
             const testerFactory = await ethers.getContractFactory('UniswapV3PoolSwapTest')
-            const tester = (await testerFactory.deploy()) as UniswapV3PoolSwapTest
+            const tester = (await testerFactory.deploy())
 
             const tickMathFactory = await ethers.getContractFactory('TickMathTest')
-            const tickMath = (await tickMathFactory.deploy()) as TickMathTest
+            const tickMath = (await tickMathFactory.deploy())
 
             await fix.token0.approve(tester.address, MaxUint256)
             await fix.token1.approve(tester.address, MaxUint256)
@@ -118,10 +109,10 @@ describe('UniswapV3Pool arbitrage tests', () => {
           let swapToHigherPrice: SwapFunction
           let swapToLowerPrice: SwapFunction
           let swapExact1For0: SwapFunction
-          let pool: MockTimeUniswapV3Pool
+          let pool: any
           let mint: MintFunction
-          let tester: UniswapV3PoolSwapTest
-          let tickMath: TickMathTest
+          let tester: any
+          let tickMath: any
 
           beforeEach('load the fixture', async () => {
             ;({
@@ -133,7 +124,7 @@ describe('UniswapV3Pool arbitrage tests', () => {
               swapExact1For0,
               tester,
               tickMath,
-            } = await loadFixture(arbTestFixture))
+            } = await arbTestFixture([wallet, arbitrageur]))
           })
 
           async function simulateSwap(
