@@ -1,10 +1,9 @@
-import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-
+import { expect } from 'chai'
 
 async function factoryFixture(): Promise<any> {
-  const factoryFactory = await ethers.getContractFactory('UniswapV3Factory')
+  const factoryFactory = await ethers.getContractFactory('VinuSwapFactory')
   const factory = (await factoryFactory.deploy())
   return { factory }
 }
@@ -30,6 +29,9 @@ export const poolFixture: any = async function (): any {
   const { factory } = await factoryFixture()
   const { token0, token1, token2 } = await tokensFixture()
 
+  const noDiscountFactory = await ethers.getContractFactory('NoDiscount')
+  const noDiscount = await noDiscountFactory.deploy()
+
   const MockTimeUniswapV3PoolDeployerFactory = await ethers.getContractFactory('MockTimeUniswapV3PoolDeployer')
   const MockTimeUniswapV3PoolFactory = await ethers.getContractFactory('MockTimeUniswapV3Pool')
 
@@ -53,7 +55,8 @@ export const poolFixture: any = async function (): any {
         firstToken.address,
         secondToken.address,
         fee,
-        tickSpacing
+        tickSpacing,
+        noDiscount.address
       )
 
       const receipt = await tx.wait()
