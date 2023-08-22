@@ -879,30 +879,6 @@ describe('test BasePool', function () {
 
             })
         })
-
-        describe('setting protocol fees', function () {
-            it('sets the protocol fee', async function () {
-                // TODO
-                // The fee breakdown is:
-                // Total fee: 0.25%
-                //   0.20% goes to LPs
-                //   0.05% (aka 1/5th of the fee) goes to the protocol
-                //     0.01% goes to the treasury
-                //     0.02% goes to VINU Buy & Burn
-                //     0.02% goes to VC Buy & Burn
-            })
-            it('fails to set the protocol fee if not the owner', async function () {
-                // TODO
-            })
-            it('fails to set the protocol fee if the fee is too high', async function () {
-                // TODO
-            })
-        })
-
-        describe('fee tiers', function () {
-            
-        })
-
     })
 
     describe('updated deployment', function () {
