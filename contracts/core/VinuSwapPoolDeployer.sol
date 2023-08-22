@@ -1,21 +1,24 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.7.6;
 
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3PoolDeployer.sol';
+import './interfaces/IVinuSwapPoolDeployer.sol';
 
 import './VinuSwapPool.sol';
 
-contract VinuSwapPoolDeployer is IUniswapV3PoolDeployer {
-    struct Parameters {
-        address factory;
-        address token0;
-        address token1;
-        uint24 fee;
-        int24 tickSpacing;
-    }
+contract VinuSwapPoolDeployer is IVinuSwapPoolDeployer {
+    address internal _factory;
+    address internal _token0;
+    address internal _token1;
+    uint24 internal _fee;
+    int24 internal _tickSpacing;
 
-    /// @inheritdoc IUniswapV3PoolDeployer
-    Parameters public override parameters;
+    function parameters() public view override returns (address factory, address token0, address token1, uint24 fee, int24 tickSpacing, address feeManager) {
+        factory = _factory;
+        token0 = _token0;
+        token1 = _token1;
+        fee = _fee;
+        tickSpacing = _tickSpacing;
+    }
 
     /// @dev Deploys a pool with the given parameters by transiently setting the parameters storage slot and then
     /// clearing it after deploying the pool.
@@ -31,8 +34,11 @@ contract VinuSwapPoolDeployer is IUniswapV3PoolDeployer {
         uint24 fee,
         int24 tickSpacing
     ) internal returns (address pool) {
-        parameters = Parameters({factory: factory, token0: token0, token1: token1, fee: fee, tickSpacing: tickSpacing});
+        _factory = factory;
+        _token0 = token0;
+        _token1 = token1;
+        _fee = fee;
+        _tickSpacing = tickSpacing;
         pool = address(new VinuSwapPool{salt: keccak256(abi.encode(token0, token1, fee))}());
-        delete parameters;
     }
 }
