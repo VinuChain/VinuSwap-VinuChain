@@ -8,11 +8,11 @@ pragma solidity >=0.5.0;
 interface IVinuSwapPoolDeployer {
     /// @notice Get the parameters to be used in constructing the pool, set transiently during pool creation.
     /// @dev Called by the pool constructor to fetch the parameters of the pool
-    /// @return factory The factory address
-    /// @return token0 The first token of the pool by address sort order
-    /// @return token1 The second token of the pool by address sort order
-    /// @return fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
-    /// @return tickSpacing The minimum number of ticks between initialized ticks
+    /// Return factory The factory address
+    /// Return token0 The first token of the pool by address sort order
+    /// Return token1 The second token of the pool by address sort order
+    /// Return fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
+    /// Return tickSpacing The minimum number of ticks between initialized ticks
     function parameters()
         external
         view
