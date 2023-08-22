@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity >=0.5.0;
 
-/// @title The interface for the Uniswap V3 Factory
-/// @notice The Uniswap V3 Factory facilitates creation of Uniswap V3 pools and control over the protocol fees
-interface IUniswapV3Factory {
+/// @title The interface for the VinuSwap factory
+/// @notice The VinuSwap facilitates creation of VinuSwap pools and control over the protocol fees
+interface IVinuSwapFactory {
     /// @notice Emitted when the owner of the factory is changed
     /// @param oldOwner The owner before the owner was changed
     /// @param newOwner The owner after the owner was changed
@@ -14,19 +14,23 @@ interface IUniswapV3Factory {
     /// @param token1 The second token of the pool by address sort order
     /// @param fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
     /// @param tickSpacing The minimum number of ticks between initialized ticks
+    /// @param feeManager The address of the fee manager
     /// @param pool The address of the created pool
     event PoolCreated(
         address indexed token0,
         address indexed token1,
         uint24 indexed fee,
         int24 tickSpacing,
+        address feeManager,
         address pool
     );
 
+    /*
     /// @notice Emitted when a new fee amount is enabled for pool creation via the factory
     /// @param fee The enabled fee, denominated in hundredths of a bip
     /// @param tickSpacing The minimum number of ticks between initialized ticks for pools created with the given fee
     event FeeAmountEnabled(uint24 indexed fee, int24 indexed tickSpacing);
+    */
 
     /// @notice Returns the current owner of the factory
     /// @dev Can be changed by the current owner via setOwner
@@ -55,6 +59,7 @@ interface IUniswapV3Factory {
     /// @param tokenA One of the two tokens in the desired pool
     /// @param tokenB The other of the two tokens in the desired pool
     /// @param fee The desired fee for the pool
+    /// @param feeManager The address of the fee manager
     /// @dev tokenA and tokenB may be passed in either order: token0/token1 or token1/token0. tickSpacing is retrieved
     /// from the fee. The call will revert if the pool already exists, the fee is invalid, or the token arguments
     /// are invalid.
@@ -62,7 +67,8 @@ interface IUniswapV3Factory {
     function createPool(
         address tokenA,
         address tokenB,
-        uint24 fee
+        uint24 fee,
+        address feeManager
     ) external returns (address pool);
 
     /// @notice Updates the owner of the factory
