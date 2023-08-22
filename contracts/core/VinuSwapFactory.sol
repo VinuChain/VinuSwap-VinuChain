@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity =0.7.6;
 
-import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
+import './interfaces/IVinuSwapFactory.sol';
 
 import './VinuSwapPoolDeployer.sol';
 import './NoDelegateCall.sol';
@@ -10,13 +10,13 @@ import './VinuSwapPool.sol';
 
 /// @title Canonical VinuSwap factory
 /// @notice Deploys VinuSwap pools and manages ownership and control over pool protocol fees
-contract VinuSwapFactory is IUniswapV3Factory, VinuSwapPoolDeployer, NoDelegateCall {
-    /// @inheritdoc IUniswapV3Factory
+contract VinuSwapFactory is IVinuSwapFactory, VinuSwapPoolDeployer, NoDelegateCall {
+    /// @inheritdoc IVinuSwapFactory
     address public override owner;
 
-    /// @inheritdoc IUniswapV3Factory
+    /// @inheritdoc IVinuSwapFactory
     mapping(uint24 => int24) public override feeAmountTickSpacing;
-    /// @inheritdoc IUniswapV3Factory
+    /// @inheritdoc IVinuSwapFactory
     mapping(address => mapping(address => mapping(uint24 => address))) public override getPool;
 
     constructor() {
@@ -24,14 +24,14 @@ contract VinuSwapFactory is IUniswapV3Factory, VinuSwapPoolDeployer, NoDelegateC
         emit OwnerChanged(address(0), msg.sender);
 
         feeAmountTickSpacing[500] = 10;
-        emit FeeAmountEnabled(500, 10);
+        // emit FeeAmountEnabled(500, 10);
         feeAmountTickSpacing[3000] = 60;
-        emit FeeAmountEnabled(3000, 60);
+        // emit FeeAmountEnabled(3000, 60);
         feeAmountTickSpacing[10000] = 200;
-        emit FeeAmountEnabled(10000, 200);
+        // emit FeeAmountEnabled(10000, 200);
     }
 
-    /// @inheritdoc IUniswapV3Factory
+    /// @inheritdoc IVinuSwapFactory
     function createPool(
         address tokenA,
         address tokenB,
@@ -50,14 +50,14 @@ contract VinuSwapFactory is IUniswapV3Factory, VinuSwapPoolDeployer, NoDelegateC
         emit PoolCreated(token0, token1, fee, tickSpacing, pool);
     }
 
-    /// @inheritdoc IUniswapV3Factory
+    /// @inheritdoc IVinuSwapFactory
     function setOwner(address _owner) external override {
         require(msg.sender == owner);
         emit OwnerChanged(owner, _owner);
         owner = _owner;
     }
 
-    /// @inheritdoc IUniswapV3Factory
+    /// @inheritdoc IVinuSwapFactory
     function enableFeeAmount(uint24 fee, int24 tickSpacing) public override {
         require(msg.sender == owner);
         require(fee < 1000000);
@@ -68,6 +68,5 @@ contract VinuSwapFactory is IUniswapV3Factory, VinuSwapPoolDeployer, NoDelegateC
         require(feeAmountTickSpacing[fee] == 0);
 
         feeAmountTickSpacing[fee] = tickSpacing;
-        emit FeeAmountEnabled(fee, tickSpacing);
     }
 }
