@@ -270,10 +270,8 @@ describe('test BasePool', function () {
 
             expect(factoryContract.address).to.be.a('string')
 
-            await factoryContract.enableFeeAmount(FEE, TICK_SPACING)
-
             noDiscountContract = await noDiscountBlueprint.deploy()
-            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, noDiscountContract.address)
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, TICK_SPACING, noDiscountContract.address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
             contract = contractBlueprint.attach(contractAddress)
@@ -303,10 +301,8 @@ describe('test BasePool', function () {
 
             expect(factoryContract.address).to.be.a('string')
 
-            await factoryContract.enableFeeAmount(FEE, TICK_SPACING)
-
             noDiscountContract = await noDiscountBlueprint.deploy()
-            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, noDiscountContract.address)
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, TICK_SPACING, noDiscountContract.address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
             contract = contractBlueprint.attach(contractAddress)
@@ -909,6 +905,64 @@ describe('test BasePool', function () {
 
     })
 
+    describe('updated deployment', function () {
+        // Sanity checks after the various modifications to how deployment works
+
+        beforeEach(async function () {
+            noDiscountContract = await noDiscountBlueprint.deploy()
+            expect(noDiscountContract.address).to.be.a('string')
+            factoryContract = await factoryBlueprint.deploy()
+            expect(factoryContract.address).to.be.a('string')
+        })
+
+        it('deploys a pool', async function () {
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, TICK_SPACING, noDiscountContract.address)
+            const contractAddress = (await tx.wait()).events[0].args.pool
+            expect(contractAddress).to.be.a('string')
+        })
+
+        it('deploys a pool with a new owner', async function () {
+            const [alice] = await newUsers([])
+            await factoryContract.setOwner(alice.address)
+
+            const tx = await factoryContract.connect(alice).createPool(TOKEN_0, TOKEN_1, FEE, TICK_SPACING, noDiscountContract.address)
+            const contractAddress = (await tx.wait()).events[0].args.pool
+            expect(contractAddress).to.be.a('string')
+        })
+
+        it('fails to deploy when the two tokens are the same', async function () {
+            await expect(
+                factoryContract.createPool(TOKEN_0, TOKEN_0, FEE, TICK_SPACING, noDiscountContract.address)
+            ).to.be.eventually.rejected
+        })
+
+        it('fails to deploy with a fee too high', async function () {
+            // 100.0001% fee
+            await expect(
+                factoryContract.createPool(TOKEN_0, TOKEN_1, 1000001, TICK_SPACING, noDiscountContract.address)
+            ).to.be.eventually.rejected
+        })
+
+        it('fails to deploy with a zero tick spacing', async function () {
+            await expect(
+                factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, 0, noDiscountContract.address)
+            ).to.be.eventually.rejected
+        })
+
+        it('fails to deploy with a tick spacing too high', async function () {
+            await expect(
+                factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, 16384 + 1, noDiscountContract.address)
+            ).to.be.eventually.rejected
+        })
+
+        it('fails to deploy without being the owner', async function () {
+            const [alice] = await newUsers([])
+            await expect(
+                factoryContract.connect(alice).createPool(TOKEN_0, TOKEN_1, FEE, TICK_SPACING, noDiscountContract.address)
+            ).to.be.eventually.rejected
+        })
+    })
+
     describe('fee tiers', function () {
         const FEE_TIER_FEE = 100000 // 10%
         const FEE_TIER_TICK_SPACING = 1
@@ -917,12 +971,10 @@ describe('test BasePool', function () {
             factoryContract = await factoryBlueprint.deploy()
 
             expect(factoryContract.address).to.be.a('string')
-
-            await factoryContract.enableFeeAmount(FEE_TIER_FEE, FEE_TIER_TICK_SPACING)
         })
 
         it('checks that the output of computeFee is used correctly (with no discount)', async function () {
-            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, (await noDiscountBlueprint.deploy()).address)
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, FEE_TIER_TICK_SPACING, (await noDiscountBlueprint.deploy()).address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
             contract = contractBlueprint.attach(contractAddress)
@@ -1004,7 +1056,7 @@ describe('test BasePool', function () {
 
         it('checks that the output of computeFee is used correctly (with 50% discount)', async function () {
             const halfDiscountBlueprint = await hre.ethers.getContractFactory('HalfDiscount')
-            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, (await halfDiscountBlueprint.deploy()).address)
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, FEE_TIER_TICK_SPACING, (await halfDiscountBlueprint.deploy()).address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
             contract = contractBlueprint.attach(contractAddress)
@@ -1086,7 +1138,7 @@ describe('test BasePool', function () {
 
         it('checks that the output of computeFee is used correctly (with 100% discount)', async function () {
             const fixedFeeBlueprint = await hre.ethers.getContractFactory('FixedFee')
-            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, (await fixedFeeBlueprint.deploy(0)).address)
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, FEE_TIER_TICK_SPACING, (await fixedFeeBlueprint.deploy(0)).address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
             contract = contractBlueprint.attach(contractAddress)
@@ -1171,7 +1223,7 @@ describe('test BasePool', function () {
             const fixedFeeBlueprint = await hre.ethers.getContractFactory('FixedFee')
             // 10.0001%
             const fixedFeeContract = await fixedFeeBlueprint.deploy(FEE_TIER_FEE + 1)
-            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, fixedFeeContract.address)
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, FEE_TIER_TICK_SPACING, fixedFeeContract.address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
             contract = contractBlueprint.attach(contractAddress)
@@ -1207,9 +1259,6 @@ describe('test BasePool', function () {
                 recipient : deployer.address,
                 deadline : await time.latest() + 1000000
             }
-
-            console.log(MONE)
-            console.log(FEE_TIER_FEE)
 
             await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
             await token1Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(3000))
