@@ -22,7 +22,7 @@ let controllerBlueprint : hre.ethers.ContractFactory
 let tieredDiscountBlueprint : hre.ethers.ContractFactory
 let noDiscountBlueprint : hre.ethers.ContractFactory
 let factoryBlueprint : hre.ethers.ContractFactory
-let contractBlueprint: ethers.ContractFactory
+let poolContractBlueprint: ethers.ContractFactory
 let routerBlueprint : hre.ethers.ContractFactory
 let nftDescriptorLibraryBlueprint : hre.ethers.ContractFactory
 let positionDescriptorBlueprint : hre.ethers.ContractFactory
@@ -31,7 +31,7 @@ let positionManagerBlueprint : hre.ethers.ContractFactory
 let erc20Blueprint : hre.ethers.ContractFactory
 let noDiscountContract : any
 let factoryContract : any
-let contract: any
+let poolContract: any
 let routerContract : any
 let nftDescriptorLibraryContract : any
 let positionDescriptorContract : any
@@ -120,7 +120,7 @@ export default async function getPermitNFTSignature(
 
 const checkEvents = async (tx, correct : Array<Object>, referenceContract : any | undefined = undefined) => {
     if (!referenceContract) {
-        referenceContract = contract
+        referenceContract = poolContract
     }
     const receipt = await tx.wait()
 
@@ -148,7 +148,7 @@ const checkEvents = async (tx, correct : Array<Object>, referenceContract : any 
 
 const checkQuery = async (methodName : string, params : Array<any>, expected : Array<any>, referenceContract : ethers.Contract | undefined = undefined) => {
     if (!referenceContract) {
-        referenceContract = contract
+        referenceContract = poolContract
     }
 
     const serialize = x => {
@@ -185,7 +185,7 @@ const newUsers = async (...tokenInfos : Array<Array<Array<String | Number>>>) =>
         const user = allUsers[mnemonicCounter++]
 
         const currentTokens = [token0Contract, token1Contract]
-        const currentContracts = [contract, factoryContract]
+        const currentContracts = [poolContract, factoryContract]
 
         for (const tokenPair of tokenInfo) {
             const matchingToken = currentTokens.find(x => x.address == tokenPair[0])
@@ -253,7 +253,7 @@ describe('test BasePool', function () {
 
         factoryBlueprint = await hre.ethers.getContractFactory('VinuSwapFactory')
 
-        contractBlueprint = await hre.ethers.getContractFactory('VinuSwapPool')
+        poolContractBlueprint = await hre.ethers.getContractFactory('VinuSwapPool')
 
         routerBlueprint = await hre.ethers.getContractFactory('SwapRouter')
 
@@ -281,9 +281,9 @@ describe('test BasePool', function () {
             const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, TICK_SPACING, noDiscountContract.address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
-            contract = contractBlueprint.attach(contractAddress)
+            poolContract = poolContractBlueprint.attach(contractAddress)
 
-            expect(contract.address).to.be.a('string')
+            expect(poolContract.address).to.be.a('string')
 
             routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
             console.log('Deployed router.')
@@ -312,9 +312,9 @@ describe('test BasePool', function () {
             const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE, TICK_SPACING, noDiscountContract.address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
-            contract = contractBlueprint.attach(contractAddress)
+            poolContract = poolContractBlueprint.attach(contractAddress)
 
-            expect(contract.address).to.be.a('string')
+            expect(poolContract.address).to.be.a('string')
 
             routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
 
@@ -335,7 +335,7 @@ describe('test BasePool', function () {
             // to make sure that the contract is working as usual
             describe('liquidity', function () {
                 it('deposits liquidity', async function () {
-                    await contract.initialize(encodePriceSqrt(BigNumber.from(1)))
+                    await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
 
                     const mintParams = {
                         token0 : TOKEN_0,
@@ -357,7 +357,7 @@ describe('test BasePool', function () {
 
                 })
                 it('deposits and increases liquidity', async function () {
-                    await contract.initialize(encodePriceSqrt(BigNumber.from(1)))
+                    await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
 
                     const mintParams = {
                         token0 : TOKEN_0,
@@ -393,7 +393,7 @@ describe('test BasePool', function () {
 
                 })
                 it('deposits and decreases liquidity', async function () {
-                    await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                    await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                     const mintParams = {
                         token0 : TOKEN_0,
@@ -416,7 +416,7 @@ describe('test BasePool', function () {
                     await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
                     await positionManagerContract.connect(deployer).mint(mintParams)
 
-                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('liquidity', [], [1414], poolContract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
 
@@ -430,7 +430,7 @@ describe('test BasePool', function () {
 
                     await positionManagerContract.connect(deployer).decreaseLiquidity(decreaseParams)
 
-                    await checkQuery('liquidity', [], [707], contract)
+                    await checkQuery('liquidity', [], [707], poolContract)
                     // Since the current ratio was 2:1, the obtained amounts are 2:1 as well
                     // Note that the amounts are not exact because of rounding
                     await checkQuery('tokensOwed', [1], [499, 999], positionManagerContract)
@@ -449,7 +449,7 @@ describe('test BasePool', function () {
                 })
 
                 it('deposits, decreases and burns', async function () {
-                    await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                    await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                     const mintParams = {
                         token0 : TOKEN_0,
@@ -472,7 +472,7 @@ describe('test BasePool', function () {
                     await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
                     await positionManagerContract.connect(deployer).mint(mintParams)
 
-                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('liquidity', [], [1414], poolContract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
 
@@ -487,7 +487,7 @@ describe('test BasePool', function () {
 
                     await positionManagerContract.connect(deployer).decreaseLiquidity(decreaseParams)
 
-                    await checkQuery('liquidity', [], [0], contract)
+                    await checkQuery('liquidity', [], [0], poolContract)
                     // Since the current ratio was 2:1, the obtained amounts are 2:1 as well
                     // Note that the amounts are not exact because of rounding
                     await checkQuery('tokensOwed', [1], [999, 1999], positionManagerContract)
@@ -511,7 +511,7 @@ describe('test BasePool', function () {
             describe('swapping', function () {
                 it('swaps with exact input', async function () {
                     const [alice] = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
-                    await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                    await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                     const mintParams = {
                         token0 : TOKEN_0,
@@ -534,7 +534,7 @@ describe('test BasePool', function () {
                     await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
                     await positionManagerContract.connect(deployer).mint(mintParams)
 
-                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('liquidity', [], [1414], poolContract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
 
@@ -553,7 +553,7 @@ describe('test BasePool', function () {
 
                     await routerContract.connect(alice).exactInputSingle(swapParams)
 
-                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('liquidity', [], [1414], poolContract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
                     await checkQuery('balanceOf', [alice.address], [0], token0Contract)
@@ -561,7 +561,7 @@ describe('test BasePool', function () {
                 })
                 it('swaps with exact output', async function () {
                     const [alice] = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
-                    await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                    await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                     const mintParams = {
                         token0 : TOKEN_0,
@@ -584,7 +584,7 @@ describe('test BasePool', function () {
                     await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
                     await positionManagerContract.connect(deployer).mint(mintParams)
 
-                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('liquidity', [], [1414], poolContract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
 
@@ -603,7 +603,7 @@ describe('test BasePool', function () {
 
                     await routerContract.connect(alice).exactOutputSingle(swapParams)
 
-                    await checkQuery('liquidity', [], [1414], contract)
+                    await checkQuery('liquidity', [], [1414], poolContract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken0Balance.sub(1000)], token0Contract)
                     await checkQuery('balanceOf', [deployer.address], [initialToken1Balance.sub(2000)], token1Contract)
                     await checkQuery('balanceOf', [alice.address], [0], token0Contract)
@@ -614,7 +614,7 @@ describe('test BasePool', function () {
 
         describe('locking', function () {
             it('locks a position', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                 const mintParams = {
                     token0 : TOKEN_0,
@@ -637,7 +637,7 @@ describe('test BasePool', function () {
                 await positionManagerContract.connect(deployer).lock(1, await time.latest() + 30, await time.latest() + 1000000)
             })
             it('re-locks a position', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                 const mintParams = {
                     token0 : TOKEN_0,
@@ -667,7 +667,7 @@ describe('test BasePool', function () {
             })
             it('locks someone else\'s position when approved', async function () {
                 const [alice] = await newUsers([])
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                 const mintParams = {
                     token0 : TOKEN_0,
@@ -698,7 +698,7 @@ describe('test BasePool', function () {
                 await positionManagerContract.connect(alice).lock(1, lockedUntil, await time.latest() + 1000000)
             })
             it('reduces liquidity after the lock deadline', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                 const mintParams = {
                     token0 : TOKEN_0,
@@ -741,7 +741,7 @@ describe('test BasePool', function () {
             })
             it('fails to lock someone else\'s position without being approved', async function () {
                 const [alice] = await newUsers([])
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                 const mintParams = {
                     token0 : TOKEN_0,
@@ -766,7 +766,7 @@ describe('test BasePool', function () {
                 ).to.be.eventually.rejectedWith('Not approved')
             })
             it('fails to lock a position after the deadline', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                 const mintParams = {
                     token0 : TOKEN_0,
@@ -793,7 +793,7 @@ describe('test BasePool', function () {
                 ).to.be.eventually.rejectedWith('Transaction too old')
             })
             it('fails to lock a position in the past', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                 const mintParams = {
                     token0 : TOKEN_0,
@@ -820,7 +820,7 @@ describe('test BasePool', function () {
                 ).to.be.eventually.rejectedWith('Invalid lockedUntil')
             })
             it('fails to lock a position earlier than the current lock', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                 const mintParams = {
                     token0 : TOKEN_0,
@@ -848,7 +848,7 @@ describe('test BasePool', function () {
                 ).to.be.eventually.rejectedWith('Invalid lockedUntil')
             })
             it('fails to reduce liquidity before the lock deadline', async function () {
-                await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                 const mintParams = {
                     token0 : TOKEN_0,
@@ -1115,9 +1115,9 @@ describe('test BasePool', function () {
                     const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
                     const contractAddress = (await tx.wait()).events[0].args.pool
 
-                    contract = contractBlueprint.attach(contractAddress)
+                    poolContract = poolContractBlueprint.attach(contractAddress)
 
-                    expect(contract.address).to.be.a('string')
+                    expect(poolContract.address).to.be.a('string')
 
                     routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
 
@@ -1133,7 +1133,7 @@ describe('test BasePool', function () {
                     )
 
                     const [eric] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
-                    await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+                    await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
                     const mintParams = {
                         token0 : TOKEN_0,
@@ -1166,7 +1166,7 @@ describe('test BasePool', function () {
                         sqrtPriceLimitX96 : 0
                     }
 
-                    await contract.setFeeProtocol(4, 5)
+                    await poolContract.setFeeProtocol(4, 5)
                     await factoryContract.setOwner(controllerContract.address)
 
                     await routerContract.connect(eric).exactInputSingle(swapParams)
@@ -1176,12 +1176,12 @@ describe('test BasePool', function () {
                     // So we are expecting 0.1 MONE / 4 = 0.025 MONE token0 and 0 token1
                     const expectedFee = MONE.div(10).div(4)
 
-                    const protocolFees = await contract.protocolFees()
+                    const protocolFees = await poolContract.protocolFees()
                     expect(protocolFees.token0).to.equal(expectedFee)
                     expect(protocolFees.token1).to.equal(0)
 
                     const UINT128_MAX = BigNumber.from(2).pow(128).sub(1)
-                    await controllerContract.connect(dan).collectProtocolFees(contract.address, UINT128_MAX, UINT128_MAX)
+                    await controllerContract.connect(dan).collectProtocolFees(poolContract.address, UINT128_MAX, UINT128_MAX)
 
                     // Alice has 10% of the shares
                     await checkQuery('balanceOf', [alice.address, TOKEN_0], [expectedFee.div(10).add(1)], controllerContract)
@@ -1201,10 +1201,10 @@ describe('test BasePool', function () {
                     const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
                     const contractAddress = (await tx.wait()).events[1].args.pool
 
-                    contract = contractBlueprint.attach(contractAddress)
+                    poolContract = poolContractBlueprint.attach(contractAddress)
                     
                     // Check that it was deployed correctly
-                    await checkQuery('token0', [], [TOKEN_0], contract)
+                    await checkQuery('token0', [], [TOKEN_0], poolContract)
                 })
                 it('fails to create a pool without being the owner', async function () {
                     await factoryContract.setOwner(controllerContract.address)
@@ -1221,8 +1221,8 @@ describe('test BasePool', function () {
                     const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
                     const contractAddress = (await tx.wait()).events[1].args.pool
 
-                    contract = contractBlueprint.attach(contractAddress)
-                    await controllerContract.initialize(contract.address, encodePriceSqrt(BigNumber.from(2)))
+                    poolContract = poolContractBlueprint.attach(contractAddress)
+                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
                 })
                 it('fails to initialize a pool without being the owner', async function () {
                     await factoryContract.setOwner(controllerContract.address)
@@ -1232,9 +1232,9 @@ describe('test BasePool', function () {
 
                     const [eric] = await newUsers([])
 
-                    contract = contractBlueprint.attach(contractAddress)
+                    poolContract = poolContractBlueprint.attach(contractAddress)
                     await expect(
-                        controllerContract.connect(eric).initialize(contract.address, encodePriceSqrt(BigNumber.from(2)))
+                        controllerContract.connect(eric).initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
                     ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
                 })
                 it('sets protocol fees', async function () {
@@ -1243,9 +1243,9 @@ describe('test BasePool', function () {
                     const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
                     const contractAddress = (await tx.wait()).events[1].args.pool
 
-                    contract = contractBlueprint.attach(contractAddress)
-                    await controllerContract.initialize(contract.address, encodePriceSqrt(BigNumber.from(2)))
-                    await controllerContract.connect(dan).setFeeProtocol(contract.address, 4, 5)
+                    poolContract = poolContractBlueprint.attach(contractAddress)
+                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
+                    await controllerContract.connect(dan).setFeeProtocol(poolContract.address, 4, 5)
                 })
                 it('fails to set protocol fees without being the owner', async function () {
                     await factoryContract.setOwner(controllerContract.address)
@@ -1253,13 +1253,13 @@ describe('test BasePool', function () {
                     const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
                     const contractAddress = (await tx.wait()).events[1].args.pool
 
-                    contract = contractBlueprint.attach(contractAddress)
-                    await controllerContract.initialize(contract.address, encodePriceSqrt(BigNumber.from(2)))
+                    poolContract = poolContractBlueprint.attach(contractAddress)
+                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
 
                     const [eric] = await newUsers([])
 
                     await expect(
-                        controllerContract.connect(eric).setFeeProtocol(contract.address, 4, 5)
+                        controllerContract.connect(eric).setFeeProtocol(poolContract.address, 4, 5)
                     ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
                 })
             })
@@ -1338,9 +1338,9 @@ describe('test BasePool', function () {
             const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, FEE_TIER_TICK_SPACING, (await noDiscountBlueprint.deploy()).address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
-            contract = contractBlueprint.attach(contractAddress)
+            poolContract = poolContractBlueprint.attach(contractAddress)
 
-            expect(contract.address).to.be.a('string')
+            expect(poolContract.address).to.be.a('string')
 
             routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
 
@@ -1356,7 +1356,7 @@ describe('test BasePool', function () {
             )
 
             const [alice] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
-            await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+            await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
             const mintParams = {
                 token0 : TOKEN_0,
@@ -1420,9 +1420,9 @@ describe('test BasePool', function () {
             const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, FEE_TIER_TICK_SPACING, (await halfDiscountBlueprint.deploy()).address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
-            contract = contractBlueprint.attach(contractAddress)
+            poolContract = poolContractBlueprint.attach(contractAddress)
 
-            expect(contract.address).to.be.a('string')
+            expect(poolContract.address).to.be.a('string')
 
             routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
 
@@ -1438,7 +1438,7 @@ describe('test BasePool', function () {
             )
 
             const [alice] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
-            await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+            await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
             const mintParams = {
                 token0 : TOKEN_0,
@@ -1502,9 +1502,9 @@ describe('test BasePool', function () {
             const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, FEE_TIER_TICK_SPACING, (await fixedFeeBlueprint.deploy(0)).address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
-            contract = contractBlueprint.attach(contractAddress)
+            poolContract = poolContractBlueprint.attach(contractAddress)
 
-            expect(contract.address).to.be.a('string')
+            expect(poolContract.address).to.be.a('string')
 
             routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
 
@@ -1520,7 +1520,7 @@ describe('test BasePool', function () {
             )
 
             const [alice] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
-            await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+            await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
             const mintParams = {
                 token0 : TOKEN_0,
@@ -1587,9 +1587,9 @@ describe('test BasePool', function () {
             const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, FEE_TIER_TICK_SPACING, fixedFeeContract.address)
             const contractAddress = (await tx.wait()).events[0].args.pool
 
-            contract = contractBlueprint.attach(contractAddress)
+            poolContract = poolContractBlueprint.attach(contractAddress)
 
-            expect(contract.address).to.be.a('string')
+            expect(poolContract.address).to.be.a('string')
 
             routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
 
@@ -1605,7 +1605,7 @@ describe('test BasePool', function () {
             )
 
             const [alice] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
-            await contract.initialize(encodePriceSqrt(BigNumber.from(2)))
+            await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
 
             const mintParams = {
                 token0 : TOKEN_0,
