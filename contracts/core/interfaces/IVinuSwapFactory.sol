@@ -37,12 +37,6 @@ interface IVinuSwapFactory {
     /// @return The address of the factory owner
     function owner() external view returns (address);
 
-    /// @notice Returns the tick spacing for a given fee amount, if enabled, or 0 if not enabled
-    /// @dev A fee amount can never be removed, so this value should be hard coded or cached in the calling context
-    /// @param fee The enabled fee, denominated in hundredths of a bip. Returns 0 in case of unenabled fee
-    /// @return The tick spacing
-    function feeAmountTickSpacing(uint24 fee) external view returns (int24);
-
     /// @notice Returns the pool address for a given pair of tokens and a fee, or address 0 if it does not exist
     /// @dev tokenA and tokenB may be passed in either token0/token1 or token1/token0 order
     /// @param tokenA The contract address of either token0 or token1
@@ -59,6 +53,7 @@ interface IVinuSwapFactory {
     /// @param tokenA One of the two tokens in the desired pool
     /// @param tokenB The other of the two tokens in the desired pool
     /// @param fee The desired fee for the pool
+    /// @param tickSpacing The spacing between ticks
     /// @param feeManager The address of the fee manager
     /// @dev tokenA and tokenB may be passed in either order: token0/token1 or token1/token0. tickSpacing is retrieved
     /// from the fee. The call will revert if the pool already exists, the fee is invalid, or the token arguments
@@ -68,6 +63,7 @@ interface IVinuSwapFactory {
         address tokenA,
         address tokenB,
         uint24 fee,
+        int24 tickSpacing,
         address feeManager
     ) external returns (address pool);
 
@@ -75,10 +71,4 @@ interface IVinuSwapFactory {
     /// @dev Must be called by the current owner
     /// @param _owner The new owner of the factory
     function setOwner(address _owner) external;
-
-    /// @notice Enables a fee amount with the given tickSpacing
-    /// @dev Fee amounts may never be removed once enabled
-    /// @param fee The fee amount to enable, denominated in hundredths of a bip (i.e. 1e-6)
-    /// @param tickSpacing The spacing between ticks to be enforced for all pools created with the given fee amount
-    function enableFeeAmount(uint24 fee, int24 tickSpacing) external;
 }
