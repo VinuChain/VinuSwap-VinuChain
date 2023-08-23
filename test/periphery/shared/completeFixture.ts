@@ -10,8 +10,8 @@ const completeFixture: Fixture<{
   nft: any
   nftDescriptor: any
   tokens: [any, any, any]
-}> = async ([wallet], provider) => {
-  const { weth9, factory, router } = await v3RouterFixture([wallet], provider)
+}> = async ([wallet]) => {
+  const { weth9, factory, router } = await v3RouterFixture([wallet])
 
   const tokenFactory = await ethers.getContractFactory('TestERC20')
   const tokens: [any, any, any] = [

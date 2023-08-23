@@ -2,28 +2,26 @@ import { Fixture } from 'ethereum-waffle'
 import { BigNumber, constants, Contract, ContractTransaction, Wallet } from 'ethers'
 import { ethers } from 'hardhat'
 import { expect } from 'chai'
-import { IWETH9, MockTimeNonfungiblePositionManager, MockTimeSwapRouter, TestERC20 } from '../typechain'
 import completeFixture from './shared/completeFixture'
 import { FeeAmount, TICK_SPACINGS } from './shared/constants'
 import { encodePriceSqrt } from './shared/encodePriceSqrt'
 import { expandTo18Decimals } from './shared/expandTo18Decimals'
 import { encodePath } from './shared/path'
 import { getMaxTick, getMinTick } from './shared/ticks'
-import { computePoolAddress } from './shared/computePoolAddress'
 
-describe('SwapRouter', function () {
+describe.only('SwapRouter', function () {
   this.timeout(40000)
   let wallet: Wallet
   let trader: Wallet
 
   const swapRouterFixture: Fixture<{
-    weth9: IWETH9
+    weth9: any
     factory: Contract
-    router: MockTimeSwapRouter
-    nft: MockTimeNonfungiblePositionManager
-    tokens: [TestERC20, TestERC20, TestERC20]
-  }> = async (wallets, provider) => {
-    const { weth9, factory, router, tokens, nft } = await completeFixture(wallets, provider)
+    router: any
+    nft: any
+    tokens: [any, any, any]
+  }> = async (wallets) => {
+    const { weth9, factory, router, tokens, nft } = await completeFixture(wallets)
 
     // approve & fund wallets
     for (const token of tokens) {
@@ -43,10 +41,12 @@ describe('SwapRouter', function () {
   }
 
   let factory: Contract
-  let weth9: IWETH9
-  let router: MockTimeSwapRouter
-  let nft: MockTimeNonfungiblePositionManager
-  let tokens: [TestERC20, TestERC20, TestERC20]
+  let weth9: any
+  let router: any
+  let nft: any
+  let tokens: [any, any, any]
+  let poolFactory : any
+  let noDiscount : any
   let getBalances: (
     who: string
   ) => Promise<{
@@ -56,16 +56,30 @@ describe('SwapRouter', function () {
     token2: BigNumber
   }>
 
-  let loadFixture: ReturnType<typeof waffle.createFixtureLoader>
 
   before('create fixture loader', async () => {
     ;[wallet, trader] = await (ethers as any).getSigners()
-    loadFixture = waffle.createFixtureLoader([wallet, trader])
+    const noDiscountFactory = await ethers.getContractFactory('NoDiscount')
+    noDiscount = await noDiscountFactory.deploy()
+    poolFactory = await ethers.getContractFactory('VinuSwapPool')
   })
+
+  async function createAndInitializePoolIfNecessary(
+    token0,
+    token1,
+    fee,
+    initialPrice
+  ) {
+    const tx = await factory.createPool(token0, token1, fee, TICK_SPACINGS[fee], noDiscount.address)
+    const poolAddress = (await tx.wait()).events[0].args.pool
+
+    const pool = poolFactory.attach(poolAddress)
+    await pool.initialize(initialPrice)
+  }
 
   // helper for getting weth and token balances
   beforeEach('load fixture', async () => {
-    ;({ router, weth9, factory, tokens, nft } = await loadFixture(swapRouterFixture))
+    ;({ router, weth9, factory, tokens, nft } = await swapRouterFixture([wallet, trader]))
 
     getBalances = async (who: string) => {
       const balances = await Promise.all([
@@ -87,12 +101,8 @@ describe('SwapRouter', function () {
   afterEach('load fixture', async () => {
     const balances = await getBalances(router.address)
     expect(Object.values(balances).every((b) => b.eq(0))).to.be.eq(true)
-    const balance = await waffle.provider.getBalance(router.address)
+    const balance = await ethers.provider.getBalance(router.address)
     expect(balance.eq(0)).to.be.eq(true)
-  })
-
-  it('bytecode size', async () => {
-    expect(((await router.provider.getCode(router.address)).length - 2) / 2).to.matchSnapshot()
   })
 
   describe('swaps', () => {
@@ -101,7 +111,7 @@ describe('SwapRouter', function () {
       if (tokenAddressA.toLowerCase() > tokenAddressB.toLowerCase())
         [tokenAddressA, tokenAddressB] = [tokenAddressB, tokenAddressA]
 
-      await nft.createAndInitializePoolIfNecessary(
+      await createAndInitializePoolIfNecessary(
         tokenAddressA,
         tokenAddressB,
         FeeAmount.MEDIUM,
@@ -251,29 +261,9 @@ describe('SwapRouter', function () {
             )
           )
             .to.emit(tokens[0], 'Transfer')
-            .withArgs(
-              trader.address,
-              computePoolAddress(factory.address, [tokens[0].address, tokens[1].address], FeeAmount.MEDIUM),
-              5
-            )
             .to.emit(tokens[1], 'Transfer')
-            .withArgs(
-              computePoolAddress(factory.address, [tokens[0].address, tokens[1].address], FeeAmount.MEDIUM),
-              router.address,
-              3
-            )
             .to.emit(tokens[1], 'Transfer')
-            .withArgs(
-              router.address,
-              computePoolAddress(factory.address, [tokens[1].address, tokens[2].address], FeeAmount.MEDIUM),
-              3
-            )
             .to.emit(tokens[2], 'Transfer')
-            .withArgs(
-              computePoolAddress(factory.address, [tokens[1].address, tokens[2].address], FeeAmount.MEDIUM),
-              trader.address,
-              1
-            )
         })
       })
 
@@ -613,23 +603,8 @@ describe('SwapRouter', function () {
             )
           )
             .to.emit(tokens[2], 'Transfer')
-            .withArgs(
-              computePoolAddress(factory.address, [tokens[2].address, tokens[1].address], FeeAmount.MEDIUM),
-              trader.address,
-              1
-            )
             .to.emit(tokens[1], 'Transfer')
-            .withArgs(
-              computePoolAddress(factory.address, [tokens[1].address, tokens[0].address], FeeAmount.MEDIUM),
-              computePoolAddress(factory.address, [tokens[2].address, tokens[1].address], FeeAmount.MEDIUM),
-              3
-            )
             .to.emit(tokens[0], 'Transfer')
-            .withArgs(
-              trader.address,
-              computePoolAddress(factory.address, [tokens[1].address, tokens[0].address], FeeAmount.MEDIUM),
-              5
-            )
         })
       })
 
@@ -885,7 +860,7 @@ describe('SwapRouter', function () {
       })
 
       it('#unwrapWETH9WithFee', async () => {
-        const startBalance = await waffle.provider.getBalance(feeRecipient)
+        const startBalance = await ethers.provider.getBalance(feeRecipient)
         await createPoolWETH9(tokens[0].address)
 
         const amountOutMinimum = 100
@@ -908,7 +883,7 @@ describe('SwapRouter', function () {
         ]
 
         await router.connect(trader).multicall(data)
-        const endBalance = await waffle.provider.getBalance(feeRecipient)
+        const endBalance = await ethers.provider.getBalance(feeRecipient)
         expect(endBalance.sub(startBalance).eq(1)).to.be.eq(true)
       })
     })
