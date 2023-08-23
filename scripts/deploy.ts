@@ -20,8 +20,6 @@ let nftDescriptorLibraryContract : any
 let positionDescriptorContract : any
 let positionManagerContract : any
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
-
 const MONE = BigNumber.from('1000000000000000000') //10**18
 
 const FEE = 2500 // 0.25%
@@ -55,34 +53,6 @@ function encodePriceSqrt(ratio : BigNumber){
 
 function getTimestamp() {
     return Math.round(Date.now() / 1000);
-}
-
-const checkQuery = async (methodName : string, params : Array<any>, expected : Array<any>, referenceContract : ethers.Contract | undefined = undefined) => {
-    const serialize = x => {
-        if (Array.isArray(x)) {
-            return x.map(y => serialize(y))
-        }
-        if (typeof x == 'boolean') {
-            return x
-        }
-
-        if (x instanceof BigNumber) {
-            return x.toString()
-        }
-
-        return String(x)
-    }
-    let parsedExpected = serialize(expected) //expected.map(x => String(x))
-
-    if (parsedExpected.length == 1) {
-        parsedExpected = parsedExpected[0]
-    }
-
-    let actual = await referenceContract[methodName](...params)
-
-    actual = serialize(actual)
-
-    expect(await referenceContract[methodName](...params)).to.be.deep.equal(parsedExpected)
 }
 
 async function basicSetup(useMockErc20s : boolean) {

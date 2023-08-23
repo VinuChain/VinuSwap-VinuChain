@@ -8,7 +8,7 @@ import { getMaxTick, getMinTick } from './shared/ticks'
 import { sortedTokens } from './shared/tokenSort'
 import { extractJSONFromURI } from './shared/extractJSONFromURI'
 
-describe.only('NonfungibleTokenPositionDescriptor', () => {
+describe('NonfungibleTokenPositionDescriptor', () => {
   let wallets: Wallet[]
 
   const nftPositionDescriptorCompleteFixture = async (wallets) => {

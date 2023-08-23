@@ -9,7 +9,7 @@ import { expandTo18Decimals } from './shared/expandTo18Decimals'
 import { encodePath } from './shared/path'
 import { getMaxTick, getMinTick } from './shared/ticks'
 
-describe.only('SwapRouter', function () {
+describe('SwapRouter', function () {
   this.timeout(40000)
   let wallet: Wallet
   let trader: Wallet

@@ -13,7 +13,7 @@ import { getMaxTick, getMinTick } from './shared/ticks'
 import { sortedTokens } from './shared/tokenSort'
 
 
-describe.only('NonfungiblePositionManager', () => {
+describe('NonfungiblePositionManager', () => {
   let wallets: Wallet[]
   let wallet: Wallet, other: Wallet
 

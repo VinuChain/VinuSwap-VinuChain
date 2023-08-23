@@ -3,7 +3,6 @@ import bn from 'bignumber.js'
 
 import chai from "chai"
 import chaiAsPromised from "chai-as-promised"
-import { isNumberObject } from "util/types"
 
 
 import hre from 'hardhat'
@@ -42,7 +41,6 @@ let mnemonicCounter = 1
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 
 const MONE = BigNumber.from('1000000000000000000') //10**18
-// TODO: Choose adequate values
 const FEE = 25
 const TICK_SPACING = 2
 
@@ -65,86 +63,58 @@ function encodePriceSqrt(ratio : BigNumber){
 }
 
 export default async function getPermitNFTSignature(
-    wallet: Wallet,
-    positionManager: NonfungiblePositionManager,
+    wallet,
+    positionManager,
     spender: string,
-    tokenId: BigNumberish,
-    deadline: BigNumberish = constants.MaxUint256,
-    permitConfig?: { nonce?: BigNumberish; name?: string; chainId?: number; version?: string }
-  ): Promise<Signature> {
+    tokenId,
+    deadline,
+    permitConfig
+    ) {
     const [nonce, name, version, chainId] = await Promise.all([
-      permitConfig?.nonce ?? positionManager.positions(tokenId).then((p) => p.nonce),
-      permitConfig?.name ?? positionManager.name(),
-      permitConfig?.version ?? '1',
-      permitConfig?.chainId ?? wallet.getChainId(),
+        permitConfig?.nonce ?? positionManager.positions(tokenId).then((p) => p.nonce),
+        permitConfig?.name ?? positionManager.name(),
+        permitConfig?.version ?? '1',
+        permitConfig?.chainId ?? wallet.getChainId(),
     ])
-  
+
     return splitSignature(
-      await wallet._signTypedData(
+        await wallet._signTypedData(
         {
-          name,
-          version,
-          chainId,
-          verifyingContract: positionManager.address,
+            name,
+            version,
+            chainId,
+            verifyingContract: positionManager.address,
         },
         {
-          Permit: [
+            Permit: [
             {
-              name: 'spender',
-              type: 'address',
+                name: 'spender',
+                type: 'address',
             },
             {
-              name: 'tokenId',
-              type: 'uint256',
+                name: 'tokenId',
+                type: 'uint256',
             },
             {
-              name: 'nonce',
-              type: 'uint256',
+                name: 'nonce',
+                type: 'uint256',
             },
             {
-              name: 'deadline',
-              type: 'uint256',
+                name: 'deadline',
+                type: 'uint256',
             },
-          ],
+            ],
         },
         {
-          owner: wallet.address,
-          spender,
-          tokenId,
-          nonce,
-          deadline,
+            owner: wallet.address,
+            spender,
+            tokenId,
+            nonce,
+            deadline,
         }
-      )
+        )
     )
-  }
-
-const checkEvents = async (tx, correct : Array<Object>, referenceContract : any | undefined = undefined) => {
-    if (!referenceContract) {
-        referenceContract = poolContract
     }
-    const receipt = await tx.wait()
-
-    let i = 0
-    for (const event of receipt.events) {
-        if (event.address == referenceContract.address) {
-
-            const result = event.args
-            
-            const correctItem = {}
-            const parsedResult = {}
-            for (const key of Object.keys(correct[i])) {
-                if (!isNumberObject(key)) {
-                    correctItem[key] = String(correct[i][key])
-                    parsedResult[key] = String(result[key])
-
-                }
-            }
-            expect(parsedResult).to.be.deep.equal(correctItem)
-
-            i++
-        }
-    }
-}
 
 const checkQuery = async (methodName : string, params : Array<any>, expected : Array<any>, referenceContract : ethers.Contract | undefined = undefined) => {
     if (!referenceContract) {
@@ -207,8 +177,6 @@ const newUsers = async (...tokenInfos : Array<Array<Array<String | Number>>>) =>
 describe('test BasePool', function () {
     before(async function() {
         this.timeout(0)
-        //provider = await vite.newProvider('http://127.0.0.1:23456')
-        //deployer = vite.newAccount(config.networks.local.mnemonic, 0, provider)
 
         const [a] = await ethers.getSigners()
         deployer = a
@@ -217,13 +185,14 @@ describe('test BasePool', function () {
         erc20Blueprint = await hre.ethers.getContractFactory('MockERC20')
 
         token0Contract = await erc20Blueprint.deploy()
-        TOKEN_0 = token0Contract.address
+        token1Contract = await erc20Blueprint.deploy()
 
-        // TOKEN_1 is always greater than TOKEN_0
-        while (token1Contract == undefined || token1Contract.address < token0Contract.address) {
-            token1Contract = await erc20Blueprint.deploy()
+        // token1Contract.address is always greater than token0Contract.address
+        if (token0Contract.address > token1Contract.address) {
+            [token0Contract, token1Contract] = [token1Contract, token0Contract]
         }
 
+        TOKEN_0 = token0Contract.address
         TOKEN_1 = token1Contract.address
 
         const weth9Blueprint = await hre.ethers.getContractFactory('WETH9')
