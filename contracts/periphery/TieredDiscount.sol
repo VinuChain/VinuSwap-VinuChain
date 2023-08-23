@@ -6,13 +6,22 @@ import '../core/interfaces/IFeeManager.sol';
 
 // TODO: Add docs
 
+/// @title Tiered Discount Fee Manager
+/// @notice Provides swap fee discounts depending on the token balance of the user
 contract TieredDiscount is IFeeManager {
     uint256 public constant DENOMINATOR = 10000;
 
+    /// @notice The token to use for fee discounts
     address public token;
+    /// @notice The thresholds for the discounts
     uint256[] public thresholds;
+    /// @notice The discounts for the thresholds (in bips)
     uint16[] public discounts;
 
+    /// @notice Contract constructor
+    /// @param _token The token to use for fee discounts
+    /// @param _thresholds The thresholds for the discounts
+    /// @param _discounts The discounts for the thresholds (in bips)
     constructor (address _token, uint256[] memory _thresholds, uint16[] memory _discounts) {
         require(_thresholds.length > 0, "Thresholds must not be empty");
         require(_thresholds.length == _discounts.length, "Thresholds and discounts must have the same length");
@@ -32,11 +41,16 @@ contract TieredDiscount is IFeeManager {
         discounts = _discounts;
     }
 
+    /// @inheritdoc IFeeManager
     function computeFee(uint24 fee) external view override returns (uint24) {
         // Note the usage of tx.origin instead of msg.sender
         return computeFeeFor(fee, tx.origin);
     }
 
+    /// @notice Computes the fee for an arbitrary address
+    /// @param fee The original fee (in hundredths of a bip), as computed by the pool
+    /// @param recipient The address for which the fee is computed
+    /// @return uint24 The fee to be charged to recipient
     function computeFeeFor(
         uint24 fee,
         address recipient

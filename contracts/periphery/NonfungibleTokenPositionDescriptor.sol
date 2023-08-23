@@ -16,16 +16,23 @@ import './libraries/TokenRatioSortOrder.sol';
 /// @title Describes NFT token positions
 /// @notice Produces a string containing the data URI for a JSON metadata string
 contract NonfungibleTokenPositionDescriptor is INonfungibleTokenPositionDescriptor {
+    /// The address of the WETH9 contract
     address public immutable WETH9;
+
+    /// The bytes32 representation of the native currency label
     /// @dev A null-terminated string
     bytes32 public immutable nativeCurrencyLabelBytes;
 
+    /// Constructor for the contract
+    /// @param _WETH9 The address of the WETH9 contract
+    /// @param _nativeCurrencyLabelBytes The bytes32 representation of the native currency label
     constructor(address _WETH9, bytes32 _nativeCurrencyLabelBytes) {
         WETH9 = _WETH9;
         nativeCurrencyLabelBytes = _nativeCurrencyLabelBytes;
     }
 
     /// @notice Returns the native currency label as a string
+    /// @return The native currency label as a string
     function nativeCurrencyLabel() public view returns (string memory) {
         uint256 len = 0;
         while (len < 32 && nativeCurrencyLabelBytes[len] != 0) {
@@ -86,6 +93,10 @@ contract NonfungibleTokenPositionDescriptor is INonfungibleTokenPositionDescript
             );
     }
 
+    /// @notice Computes whether the token0/token1 ratio is flipped
+    /// @param token0 The token0 address
+    /// @param token1 The token1 address
+    /// @param chainId The chain ID
     function flipRatio(
         address token0,
         address token1,
@@ -94,26 +105,14 @@ contract NonfungibleTokenPositionDescriptor is INonfungibleTokenPositionDescript
         return tokenRatioPriority(token0, chainId) > tokenRatioPriority(token1, chainId);
     }
 
+    /// @notice Computes the token ratio priority for a given token
+    /// @dev This function is meant to be expanded using stablecoin addresses
+    /// @param token The token address
+    /// @param chainId The chain ID
     function tokenRatioPriority(address token, uint256 chainId) public view returns (int256) {
         if (token == WETH9) {
             return TokenRatioSortOrder.DENOMINATOR;
         }
-        // Not applicable, since chainId is not 1
-        /*if (chainId == 1) {
-            if (token == USDC) {
-                return TokenRatioSortOrder.NUMERATOR_MOST;
-            } else if (token == USDT) {
-                return TokenRatioSortOrder.NUMERATOR_MORE;
-            } else if (token == DAI) {
-                return TokenRatioSortOrder.NUMERATOR;
-            } else if (token == TBTC) {
-                return TokenRatioSortOrder.DENOMINATOR_MORE;
-            } else if (token == WBTC) {
-                return TokenRatioSortOrder.DENOMINATOR_MOST;
-            } else {
-                return 0;
-            }
-        }*/
         return 0;
     }
 }

@@ -189,19 +189,6 @@ contract NonfungiblePositionManager is
         _positions[tokenId].liquidity = liquidity;
         _positions[tokenId].feeGrowthInside0LastX128 = feeGrowthInside0LastX128;
         _positions[tokenId].feeGrowthInside1LastX128 = feeGrowthInside1LastX128;
-        /*_positions[tokenId] = Position({
-            nonce: 0,
-            operator: address(0),
-            poolId: poolId,
-            tickLower: params.tickLower,
-            tickUpper: params.tickUpper,
-            liquidity: liquidity,
-            feeGrowthInside0LastX128: feeGrowthInside0LastX128,
-            feeGrowthInside1LastX128: feeGrowthInside1LastX128,
-            tokensOwed0: 0,
-            tokensOwed1: 0,
-            lockedUntil: 0
-        });*/
 
         emit IncreaseLiquidity(tokenId, liquidity, amount0, amount1);
     }

@@ -7,5 +7,6 @@ pragma abicoder v2;
 interface IFeeManager {
     /// @notice Computes the actual fee pips
     /// @param fee The current fee pips
+    /// @return uint24 The actual fee pips
     function computeFee(uint24 fee) external returns (uint24);
 }

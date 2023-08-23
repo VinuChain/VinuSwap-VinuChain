@@ -13,6 +13,7 @@ contract VinuSwapPoolDeployer is IVinuSwapPoolDeployer {
     int24 internal _tickSpacing;
     address internal _feeManager;
 
+    /// @inheritdoc IVinuSwapPoolDeployer
     function parameters() public view override returns (address factory, address token0, address token1, uint24 fee, int24 tickSpacing, address feeManager) {
         factory = _factory;
         token0 = _token0;
