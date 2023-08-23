@@ -1,5 +1,5 @@
 import { encodePriceSqrt } from './encodePriceSqrt'
-import { expect } from './expect'
+import { expect } from 'chai'
 import { formatSqrtRatioX96 } from './formatSqrtRatioX96'
 
 describe('#formatSqrtRatioX96', () => {

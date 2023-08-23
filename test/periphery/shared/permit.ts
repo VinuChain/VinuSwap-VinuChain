@@ -1,10 +1,9 @@
 import { BigNumberish, constants, Signature, Wallet } from 'ethers'
 import { splitSignature } from 'ethers/lib/utils'
-import { TestERC20, TestERC20PermitAllowed } from '../../typechain'
 
 export async function getPermitSignature(
   wallet: Wallet,
-  token: TestERC20 | TestERC20PermitAllowed,
+  token: any | any,
   spender: string,
   value: BigNumberish = constants.MaxUint256,
   deadline = constants.MaxUint256,

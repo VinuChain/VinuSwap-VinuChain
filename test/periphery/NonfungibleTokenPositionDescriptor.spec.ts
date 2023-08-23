@@ -1,6 +1,6 @@
 import { constants, Wallet } from 'ethers'
-import { waffle, ethers } from 'hardhat'
-import { expect } from './shared/expect'
+import { ethers } from 'hardhat'
+import { expect } from 'chai'
 import { Fixture } from 'ethereum-waffle'
 import { NonfungibleTokenPositionDescriptor, MockTimeNonfungiblePositionManager, TestERC20 } from '../typechain'
 import completeFixture from './shared/completeFixture'
