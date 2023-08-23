@@ -13,6 +13,7 @@
     "base64-sol": "^1.1.0",
     "bignumber.js": "^9.1.1",
     "chai-as-promised": "^7.1.1",
+    "decimal.js": "^10.4.3",
     "ethers": "^5.0.0",
     "hardhat": "^2.14.0",
     "hardhat-contract-sizer": "^2.8.0",
@@ -45,6 +46,6 @@
   "scripts": {
     "test_legacy": "./node_modules/.bin/mocha --full-trace --config ./test/mocharc.nightly.json",
     "preprocess": "npx ts-node scripts/preprocess_for_tests.ts",
-    "test": "TS_NODE_FILES=true && npm run preprocess && npx hardhat test --trace"
+    "test": "TS_NODE_FILES=true && npx hardhat test --trace"
   }
 }
