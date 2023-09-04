@@ -174,7 +174,7 @@ const newUsers = async (...tokenInfos : Array<Array<Array<String | Number>>>) =>
 }
 
 
-describe('test BasePool', function () {
+describe('test VinuSwapPool', function () {
     before(async function() {
         this.timeout(0)
 
