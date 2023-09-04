@@ -170,7 +170,7 @@ async function deployPool (fee, tickSpacing, discountContract, initialPrice) {
     // 2. Initialize the pool by calling initialize on Controller
     await controllerContract.initialize(poolContract.address, initialPrice)
 
-    // 3. Set the protocol fee on the pool by calling setFeeProtocol on Controller
+    // 3. Set the protocol fee of the pool by calling setFeeProtocol on Controller
     await controllerContract.setFeeProtocol(poolContract.address, PROTOCOL_FEE, PROTOCOL_FEE)
 
     console.log('Deployed pool.')
