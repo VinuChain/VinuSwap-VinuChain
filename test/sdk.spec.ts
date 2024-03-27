@@ -24,6 +24,7 @@ let tieredDiscountBlueprint : hre.ethers.ContractFactory
 let noDiscountBlueprint : hre.ethers.ContractFactory
 let factoryBlueprint : hre.ethers.ContractFactory
 let poolContractBlueprint: ethers.ContractFactory
+let quoterBlueprint : hre.ethers.ContractFactory
 let routerBlueprint : hre.ethers.ContractFactory
 let nftDescriptorLibraryBlueprint : hre.ethers.ContractFactory
 let positionDescriptorBlueprint : hre.ethers.ContractFactory
@@ -33,6 +34,7 @@ let erc20Blueprint : hre.ethers.ContractFactory
 let noDiscountContract : any
 let factoryContract : any
 let poolContract: any
+let quoterContract : any
 let routerContract : any
 let nftDescriptorLibraryContract : any
 let positionDescriptorContract : any
@@ -226,6 +228,8 @@ describe.only('test SDK', function () {
 
         poolContractBlueprint = await hre.ethers.getContractFactory('VinuSwapPool')
 
+        quoterBlueprint = await hre.ethers.getContractFactory('VinuSwapQuoter')
+
         routerBlueprint = await hre.ethers.getContractFactory('SwapRouter')
 
         nftDescriptorLibraryBlueprint = await hre.ethers.getContractFactory('NFTDescriptor')
@@ -291,6 +295,8 @@ describe.only('test SDK', function () {
 
             routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
 
+            quoterContract = await quoterBlueprint.deploy(factoryContract.address, WETH)
+
             positionDescriptorContract = await positionDescriptorBlueprint.deploy(
                 WETH,
                 hre.ethers.utils.formatBytes32String('VinuSwap Position')
@@ -306,14 +312,14 @@ describe.only('test SDK', function () {
         describe('getters', function () {
             it('Non-position getters', async function() {
                 await poolContract.initialize(encodePriceSqrt(BigNumber.from(342)))
-                await poolContract.setFeeProtocol(4, 5)
-                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, routerContract.address, positionManagerContract.address)
+                await poolContract.setFeeProtocol(4, 4)
+                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
                 expect(sdk.token0).to.be.equal(TOKEN_0)
                 expect(sdk.token1).to.be.equal(TOKEN_1)
                 expect(await sdk.factory()).to.be.equal(factoryContract.address)
                 expect(await sdk.unlocked()).to.be.true
                 expect(await sdk.protocolShare0()).to.be.equal(0.25)
-                expect(await sdk.protocolShare1()).to.be.equal(0.2)
+                expect(await sdk.protocolShare1()).to.be.equal(0.25)
                 expect(await sdk.balance0()).to.be.equal('0')
                 expect(await sdk.balance1()).to.be.equal('0')
                 expect(parseFloat((await sdk.price()))).to.be.approximately(342, 0.00000000001)
@@ -321,7 +327,7 @@ describe.only('test SDK', function () {
 
             it('Position getters', async function() {
                 await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
-                await poolContract.setFeeProtocol(4, 5)
+                await poolContract.setFeeProtocol(4, 4)
 
                 await token0Contract.connect(deployer).mint(MONE.mul(2000))
                 await token1Contract.connect(deployer).mint(MONE.mul(2000))
@@ -334,7 +340,7 @@ describe.only('test SDK', function () {
 
                 console.log('Position manager:', positionManagerContract.address)
 
-                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, routerContract.address, positionManagerContract.address)
+                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
                 const users = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
                 await sdk.connect(deployer).mint(0.001, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
                 
@@ -362,7 +368,7 @@ describe.only('test SDK', function () {
             describe('mint', function() {
                 it('mints a position', async function() {
                     await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
-                    await poolContract.setFeeProtocol(4, 5)
+                    await poolContract.setFeeProtocol(4, 4)
 
                     await token0Contract.connect(deployer).mint(MONE.mul(2000))
                     await token1Contract.connect(deployer).mint(MONE.mul(2000))
@@ -375,7 +381,7 @@ describe.only('test SDK', function () {
 
                     console.log('Position manager:', positionManagerContract.address)
 
-                    const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, routerContract.address, positionManagerContract.address)
+                    const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
                     const users = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
                     await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
                     //await sdk.connect(deployer).mint(21, 532, MONE.div(10).toString(), MONE.div(10).toString(), 0, users[0].address, new Date(Date.now() + 1000000))
@@ -394,20 +400,105 @@ describe.only('test SDK', function () {
             })
 
             describe('operations with liquidity', function() {
+                let sdk : VinuSwap
+                let alice: any
+                let bob: any
                 beforeEach(async function() {
                     await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
-                    await poolContract.setFeeProtocol(4, 5)
+                    await poolContract.setFeeProtocol(4, 4)
 
-                    await token0Contract.connect(deployer).mint(MONE.mul(4000))
-                    await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(2000))
-                    await token0Contract.connect(deployer).approve(routerContract.address, MONE.mul(2000))
+                    await token0Contract.connect(deployer).mint(MONE.mul(2000))
+                    await token1Contract.connect(deployer).mint(MONE.mul(2000))
+
+                    await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+                    await token1Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+
+                    await token0Contract.connect(deployer).approve(routerContract.address, MONE.mul(1000))
+                    await token1Contract.connect(deployer).approve(routerContract.address, MONE.mul(1000))
 
                     console.log('Position manager:', positionManagerContract.address)
 
-                    const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, routerContract.address, positionManagerContract.address)
-                    const users = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
+                    sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
+                    const users = await newUsers([], [])
+                    alice = users[0]
+                    bob = users[1]
                     await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
                 })
+
+                describe('swap', function() {
+                    describe('swapExactInput', function() {
+                        it('peforms a zero-one exact input swap', async function() {
+                            await token0Contract.connect(alice).mint(MONE.div(10))
+                            await token0Contract.connect(alice).approve(routerContract.address, MONE.div(10))
+    
+                            const amountOut = await sdk.connect(alice).quoteExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString())
+    
+                            expect(amountOut).to.be.equal('91266728437306413')
+    
+                            await sdk.connect(alice).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', bob.address, new Date(Date.now() + 1000000))
+                            expect(await token0Contract.balanceOf(alice.address)).to.be.equal(
+                                '0' // All the input tokens are spent
+                            )
+                            expect(await token1Contract.balanceOf(bob.address)).to.be.equal(
+                                '91266728437306413' // All the output tokens are received
+                            )
+                        })
+
+                        it('peforms a one-zero exact input swap', async function() {
+                            await token1Contract.connect(alice).mint(MONE.div(10))
+                            await token1Contract.connect(alice).approve(routerContract.address, MONE.div(10))
+    
+                            const amountOut = await sdk.connect(alice).quoteExactInput(TOKEN_1, TOKEN_0, MONE.div(10).toString())
+    
+                            expect(amountOut).to.be.equal('91266728437306413')
+    
+                            await sdk.connect(alice).swapExactInput(TOKEN_1, TOKEN_0, MONE.div(10).toString(), '0', bob.address, new Date(Date.now() + 1000000))
+                            expect(await token1Contract.balanceOf(alice.address)).to.be.equal(
+                                '0' // All the input tokens are spent
+                            )
+                            expect(await token0Contract.balanceOf(bob.address)).to.be.equal(
+                                '91266728437306413' // All the output tokens are received
+                            )
+                        })
+                    })
+
+                    describe('swapExactOutput', function() {
+                        it('peforms a zero-one exact output swap', async function() {
+                            await token0Contract.connect(alice).mint(MONE.div(10))
+                            await token0Contract.connect(alice).approve(routerContract.address, MONE.div(10))
+    
+                            const amountIn = await sdk.connect(alice).quoteExactOutput(TOKEN_0, TOKEN_1, '91266728437306413')
+    
+                            expect(amountIn).to.be.equal('99999999999999999')
+    
+                            await sdk.connect(alice).swapExactOutput(TOKEN_0, TOKEN_1, '91266728437306413', MONE.div(10).toString(), bob.address, new Date(Date.now() + 1000000))
+                            expect(await token0Contract.balanceOf(alice.address)).to.be.equal(
+                                '1' // All the input tokens are spent (except for 1 wei due to approximations)
+                            )
+                            expect(await token1Contract.balanceOf(bob.address)).to.be.equal(
+                                '91266728437306413' // All the output tokens are received (except for dust of 1 wei)
+                            )
+                        })
+
+                        it('peforms a one-zero exact output swap', async function() {
+                            await token1Contract.connect(alice).mint(MONE.div(10))
+                            await token1Contract.connect(alice).approve(routerContract.address, MONE.div(10))
+    
+                            const amountIn = await sdk.connect(alice).quoteExactOutput(TOKEN_1, TOKEN_0, '91266728437306413')
+    
+                            expect(amountIn).to.be.equal(MONE.div(10).toString())
+    
+                            await sdk.connect(alice).swapExactOutput(TOKEN_1, TOKEN_0, '91266728437306413', MONE.div(10).toString(), bob.address, new Date(Date.now() + 1000000))
+                            expect(await token1Contract.balanceOf(alice.address)).to.be.equal(
+                                '0' // All the input tokens are spent
+                            )
+                            expect(await token0Contract.balanceOf(bob.address)).to.be.equal(
+                                '91266728437306413' // All the output tokens are received
+                            )
+                        })
+                    })
+                })
+                
 
                 /*it('locks a position', async function() {
                 })*/

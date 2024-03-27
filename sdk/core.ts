@@ -8,6 +8,9 @@ import SwapRouterInfo from "../artifacts/contracts/periphery/SwapRouter.sol/Swap
 import { NonfungiblePositionManager } from "../typechain-types/contracts/periphery/NonfungiblePositionManager";
 import NonfungiblePositionManagerInfo from "../artifacts/contracts/periphery/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
 
+import { VinuSwapQuoter } from "../typechain-types/contracts/periphery/VinuSwapQuoter";
+import VinuSwapQuoterInfo from "../artifacts/contracts/periphery/VinuSwapQuoter.sol/VinuSwapQuoter.json";
+
 import ERC20Abi from "./abi/ERC20.json";
 
 import { encodePrice, decodePrice, withCustomTickSpacing, FixedMathBN } from "./utils";
@@ -24,6 +27,7 @@ class VinuSwap {
   public token1: string;
   public fee: number;
   public pool: VinuSwapPool;
+  public quoter: VinuSwapQuoter;
   public router: SwapRouter;
   public positionManager: NonfungiblePositionManager;
   public token0Contract: ethers.Contract;
@@ -36,6 +40,7 @@ class VinuSwap {
     token1: string,
     fee: number,
     pool: VinuSwapPool,
+    quoter: VinuSwapQuoter,
     router: SwapRouter,
     positionManager: NonfungiblePositionManager,
     token0Contract: ethers.Contract,
@@ -46,6 +51,7 @@ class VinuSwap {
     this.token1 = token1;
     this.fee = fee;
     this.pool = pool;
+    this.quoter = quoter;
     this.router = router;
     this.positionManager = positionManager;
     this.token0Contract = token0Contract;
@@ -59,6 +65,7 @@ class VinuSwap {
       this.token1,
       this.fee,
       this.pool.connect(signer),
+      this.quoter.connect(signer),
       this.router.connect(signer),
       this.positionManager.connect(signer),
       this.token0Contract.connect(signer),
@@ -72,6 +79,7 @@ class VinuSwap {
     tokenB: string,
     fee: number,
     poolAddress: string,
+    quoterAddress: string,
     routerAddress: string,
     positionManagerAddress: string
   ): Promise<VinuSwap> {
@@ -86,6 +94,12 @@ class VinuSwap {
       VinuSwapPoolInfo.abi,
       hre.ethers.provider.getSigner()
     ) as VinuSwapPool;
+
+    const quoter = new ethers.Contract(
+      quoterAddress,
+      VinuSwapQuoterInfo.abi,
+      hre.ethers.provider.getSigner()
+    ) as VinuSwapQuoter;
 
     const token0Address = await pool.token0();
     const token1Address = await pool.token1();
@@ -125,6 +139,7 @@ class VinuSwap {
       token1Address,
       poolFee,
       pool,
+      quoter,
       router,
       positionManager,
       token0Contract,
@@ -352,6 +367,122 @@ class VinuSwap {
       }
       //{ gasLimit: 1000000 }
     );
+    return tx;
+  }
+
+  public async quoteExactInput(
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: string
+  ) {
+    if (tokenIn != this.token0 && tokenIn != this.token1) {
+      throw new Error("TokenIn address does not match");
+    }
+    if (tokenOut != this.token0 && tokenOut != this.token1) {
+      throw new Error("TokenOut address does not match");
+    }
+    if (tokenIn == tokenOut) {
+      throw new Error("TokenIn and TokenOut addresses are the same");
+    }
+
+    const quote = await this.quoter.callStatic.quoteExactInputSingle({
+      tokenIn: tokenIn,
+      tokenOut: tokenOut,
+      fee: this.fee,
+      amountIn,
+      sqrtPriceLimitX96: 0
+    })
+
+    console.log('Obtained exact input quote: ', quote.amountOut.toString())
+
+    return quote.amountOut.toString()
+  }
+
+  public async swapExactInput(
+    tokenIn: string,
+    tokenOut: string,
+    amountIn: string,
+    amountOutMinimum: string,
+    recipient: string,
+    deadline: Date
+  ): Promise<ethers.ContractTransaction> {
+    if (tokenIn != this.token0 && tokenIn != this.token1) {
+      throw new Error("TokenIn address does not match");
+    }
+    if (tokenOut != this.token0 && tokenOut != this.token1) {
+      throw new Error("TokenOut address does not match");
+    }
+    if (tokenIn == tokenOut) {
+      throw new Error("TokenIn and TokenOut addresses are the same");
+    }
+
+    let tx = await this.router.exactInputSingle({
+      tokenIn: tokenIn,
+      tokenOut: tokenOut,
+      fee: this.fee,
+      amountIn,
+      amountOutMinimum,
+      recipient,
+      deadline: Math.ceil(deadline.getTime() / 1000),
+      sqrtPriceLimitX96: 0, // We don't use this, since amountOutMinimum is enough for slippage management
+    });
+    return tx;
+  }
+
+  public async quoteExactOutput(
+    tokenIn: string,
+    tokenOut: string,
+    amountOut: string
+  ) {
+    if (tokenIn != this.token0 && tokenIn != this.token1) {
+      throw new Error("TokenIn address does not match");
+    }
+    if (tokenOut != this.token0 && tokenOut != this.token1) {
+      throw new Error("TokenOut address does not match");
+    }
+    if (tokenIn == tokenOut) {
+      throw new Error("TokenIn and TokenOut addresses are the same");
+    }
+
+    const quote = await this.quoter.callStatic.quoteExactOutputSingle({
+      tokenIn: tokenIn,
+      tokenOut: tokenOut,
+      fee: this.fee,
+      amount: amountOut, // Note that the nomenclature is different here compared to quoteExactInput
+      sqrtPriceLimitX96: 0
+    })
+
+    return quote.amountIn.toString()
+  }
+
+  public async swapExactOutput(
+    tokenIn: string,
+    tokenOut: string,
+    amountOut: string,
+    amountInMaximum: string,
+    recipient: string,
+    deadline: Date
+  ): Promise<ethers.ContractTransaction> {
+    if (tokenIn != this.token0 && tokenIn != this.token1) {
+      throw new Error("TokenIn address does not match");
+    }
+    if (tokenOut != this.token0 && tokenOut != this.token1) {
+      throw new Error("TokenOut address does not match");
+    }
+    if (tokenIn == tokenOut) {
+      throw new Error("TokenIn and TokenOut addresses are the same");
+    }
+
+    let tx = await this.router.exactOutputSingle({
+      tokenIn: tokenIn,
+      tokenOut: tokenOut,
+      fee: this.fee,
+      amountOut,
+      amountInMaximum,
+      recipient,
+      deadline: Math.ceil(deadline.getTime() / 1000),
+      sqrtPriceLimitX96: 0, // We don't use this, since amountInMaximum is enough for slippage management
+    });
     return tx;
   }
 
