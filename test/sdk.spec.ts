@@ -382,7 +382,7 @@ describe.only('test SDK', function () {
                     console.log('Position manager:', positionManagerContract.address)
 
                     const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
-                    const users = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
+                    const users = await newUsers([])
                     await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
                     //await sdk.connect(deployer).mint(21, 532, MONE.div(10).toString(), MONE.div(10).toString(), 0, users[0].address, new Date(Date.now() + 1000000))
                     //await sdk.connect(deployer).mint(21, 532, MONE.div(10).toString(), MONE.div(10).toString(), 0, users[0].address, new Date(Date.now() + 1000000))
@@ -403,6 +403,7 @@ describe.only('test SDK', function () {
                 let sdk : VinuSwap
                 let alice: any
                 let bob: any
+                let charlie: any
                 beforeEach(async function() {
                     await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
                     await poolContract.setFeeProtocol(4, 4)
@@ -419,10 +420,11 @@ describe.only('test SDK', function () {
                     console.log('Position manager:', positionManagerContract.address)
 
                     sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
-                    const users = await newUsers([], [])
+                    const users = await newUsers([], [], [])
                     alice = users[0]
                     bob = users[1]
-                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
+                    charlie = users[2]
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, charlie.address, new Date(Date.now() + 1000000))
                 })
 
                 describe('swap', function() {
@@ -476,7 +478,7 @@ describe.only('test SDK', function () {
                                 '1' // All the input tokens are spent (except for 1 wei due to approximations)
                             )
                             expect(await token1Contract.balanceOf(bob.address)).to.be.equal(
-                                '91266728437306413' // All the output tokens are received (except for dust of 1 wei)
+                                '91266728437306413' // All the output tokens are received (except for 1 wei due to approximations)
                             )
                         })
 
@@ -499,9 +501,15 @@ describe.only('test SDK', function () {
                     })
                 })
                 
-
-                /*it('locks a position', async function() {
-                })*/
+                describe('lock', function() {
+                    it('locks a position', async function() {
+                        const currentEpoch = await time.latest()
+                        const lockedUntil = new Date((currentEpoch + 1000) * 1000)
+                        await sdk.connect(charlie).lock('1', lockedUntil, new Date(Date.now() + 1000000))
+                        expect(await sdk.positionIsLocked('1')).to.be.true
+                        expect((await sdk.positionLockedUntil('1')).getTime()).to.be.equal(lockedUntil.getTime())
+                    })
+                })
             })
         })
     })

@@ -416,7 +416,7 @@ class VinuSwap {
       throw new Error("TokenIn and TokenOut addresses are the same");
     }
 
-    let tx = await this.router.exactInputSingle({
+    const tx = await this.router.exactInputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
       fee: this.fee,
@@ -502,8 +502,9 @@ class VinuSwap {
     return "0";
   }
 
-  public async lock(): Promise<string> {
-    return "0";
+  public async lock(nftId: string, lockedUntil: Date, deadline: Date): Promise<ethers.ContractTransaction> {
+    const tx = await this.positionManager.lock(nftId, Math.floor(lockedUntil.getTime() / 1000), Math.ceil(deadline.getTime() / 1000));
+    return tx;
   }
 
   public async collectProtocol(): Promise<string> {
