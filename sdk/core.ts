@@ -262,12 +262,8 @@ class VinuSwap {
     return this.positionManager.tokenURI(nftId);
   }
 
-  public async positionTokensOwed0(nftId: string): Promise<BigNumber> {
-    return (await this.positionManager.tokensOwed(nftId))[0];
-  }
-
-  public async positionTokensOwed1(nftId: string): Promise<BigNumber> {
-    return (await this.positionManager.tokensOwed(nftId))[1];
+  public async positionTokensOwed(nftId: string): Promise<[BigNumber, BigNumber]> {
+    return await this.positionManager.callStatic.quoteTokensOwed(nftId);
   }
 
   public async positionOwner(nftId: string): Promise<string> {
@@ -490,8 +486,15 @@ class VinuSwap {
     return "0";
   }
 
-  public async collect(): Promise<string> {
-    return "0";
+  public async collect(nftId: string, recipient: string, amount0Max: string, amount1Max: string): Promise<ethers.ContractTransaction> {
+    const tx = await this.positionManager.collect({
+      tokenId: nftId,
+      recipient,
+      amount0Max,
+      amount1Max
+    })
+
+    return tx
   }
 
   public async increaseLiquidty(): Promise<string> {

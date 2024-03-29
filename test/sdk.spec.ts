@@ -357,10 +357,8 @@ describe.only('test SDK', function () {
                 expect(parseFloat(lower)).to.be.approximately(0.001, 0.0001)
                 expect(parseFloat(upper)).to.be.approximately(532, 0.1)
                 expect(await sdk.positionTokenURI('1')).to.be.not.equal('')
-                expect(await sdk.positionTokensOwed0('1')).to.be.equal('0')
-                expect(await sdk.positionTokensOwed1('1')).to.be.equal('0')
-
-                // TODO: Rimpiazzare la matematica mia con la matematica di Uniswap esatta (anche se l'errore è 1 wei)
+                expect((await sdk.positionTokensOwed('1'))[0]).to.be.equal('0')
+                expect((await sdk.positionTokensOwed('1'))[1]).to.be.equal('0')
             })
         })
 
@@ -508,6 +506,42 @@ describe.only('test SDK', function () {
                         await sdk.connect(charlie).lock('1', lockedUntil, new Date(Date.now() + 1000000))
                         expect(await sdk.positionIsLocked('1')).to.be.true
                         expect((await sdk.positionLockedUntil('1')).getTime()).to.be.equal(lockedUntil.getTime())
+                    })
+                })
+
+                describe('collect', function() {
+                    it('collects tokens owed', async function() {
+                        // Start with a swap
+                        await token0Contract.connect(alice).mint(MONE.div(10))
+                        await token0Contract.connect(alice).approve(routerContract.address, MONE.div(10))
+                        await sdk.connect(alice).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', bob.address, new Date(Date.now() + 1000000))
+                        
+                        console.log('Swapped.')
+                        console.log('Pool address:', poolContract.address)
+
+                        //await positionManagerContract.connect(charlie).
+
+                        /*await token0Contract.connect(charlie).mint(MONE.div(10))
+                        await token0Contract.connect(charlie).approve(positionManagerContract.address, MONE.div(10))
+                        await token1Contract.connect(charlie).mint(MONE.div(10))
+                        await token1Contract.connect(charlie).approve(positionManagerContract.address, MONE.div(10))
+
+                        await sdk.connect(charlie).increaseLiquidity('1', MONE.div(10).toString(), MONE.div(10).toString(), '0', '0', new Date(Date.now() + 1000000))
+
+                        //await sdk.connect(charlie).collect('1', charlie.address, '0', '0')*/
+
+
+                        expect((await sdk.positionTokensOwed('1'))[0]).to.be.equal('1875000000001')
+                        expect((await sdk.positionTokensOwed('1'))[1]).to.be.equal('0')
+
+                        await sdk.connect(charlie).collect('1', charlie.address, MONE.mul(10).toString(), MONE.mul(10).toString())
+
+                        expect((await sdk.positionTokensOwed('1'))[0]).to.be.equal('0')
+                        expect((await sdk.positionTokensOwed('1'))[1]).to.be.equal('0')
+
+                        expect(await token0Contract.balanceOf(charlie.address)).to.be.equal('1875000000001')
+                        expect(await token1Contract.balanceOf(charlie.address)).to.be.equal('0')
+
                     })
                 })
             })
