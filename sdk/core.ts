@@ -1,5 +1,4 @@
 import { ethers } from "ethers";
-import hre from "hardhat";
 
 import { VinuSwapPool } from "../typechain-types/contracts/core/VinuSwapPool";
 import { SwapRouter } from "../typechain-types/contracts/periphery/SwapRouter";
@@ -13,7 +12,7 @@ import VinuSwapQuoterInfo from "../artifacts/contracts/periphery/VinuSwapQuoter.
 
 import ERC20Abi from "./abi/ERC20.json";
 
-import { encodePrice, decodePrice, withCustomTickSpacing, FixedMathBN } from "./utils";
+import { encodePrice, decodePrice, withCustomTickSpacing } from "./utils";
 import { BigNumber } from "@ethersproject/bignumber";
 
 import { Token } from "@uniswap/sdk-core";
@@ -81,24 +80,25 @@ class VinuSwap {
     poolAddress: string,
     quoterAddress: string,
     routerAddress: string,
-    positionManagerAddress: string
+    positionManagerAddress: string,
+    signerOrProvider: ethers.providers.Provider | ethers.Signer
   ): Promise<VinuSwap> {
     const router = new ethers.Contract(
       routerAddress,
       SwapRouterInfo.abi,
-      hre.ethers.provider.getSigner()
+      signerOrProvider
     ) as SwapRouter;
 
     const pool = new ethers.Contract(
       poolAddress,
       VinuSwapPoolInfo.abi,
-      hre.ethers.provider.getSigner()
+      signerOrProvider
     ) as VinuSwapPool;
 
     const quoter = new ethers.Contract(
       quoterAddress,
       VinuSwapQuoterInfo.abi,
-      hre.ethers.provider.getSigner()
+      signerOrProvider
     ) as VinuSwapQuoter;
 
     const token0Address = await pool.token0();
@@ -120,18 +120,18 @@ class VinuSwap {
     const positionManager = new ethers.Contract(
       positionManagerAddress,
       NonfungiblePositionManagerInfo.abi,
-      hre.ethers.provider.getSigner()
+      signerOrProvider
     ) as NonfungiblePositionManager;
 
     const token0Contract = new ethers.Contract(
       token0Address,
       ERC20Abi,
-      hre.ethers.provider.getSigner()
+      signerOrProvider
     );
     const token1Contract = new ethers.Contract(
       token1Address,
       ERC20Abi,
-      hre.ethers.provider.getSigner()
+      signerOrProvider
     );
 
     return new VinuSwap(
@@ -497,8 +497,17 @@ class VinuSwap {
     return tx
   }
 
-  public async increaseLiquidty(): Promise<string> {
-    return "0";
+  public async increaseLiquidity(nftId: string, amount0Desired: string, amount1Desired: string, amount0Min: string, amount1Min: string, deadline: Date): Promise<ethers.ContractTransaction> {
+    const tx = await this.positionManager.increaseLiquidity({
+      tokenId: nftId,
+      amount0Desired,
+      amount1Desired,
+      amount0Min,
+      amount1Min,
+      deadline: Math.ceil(deadline.getTime() / 1000)
+    })
+
+    return tx
   }
 
   public async decreaseLiquidty(): Promise<string> {

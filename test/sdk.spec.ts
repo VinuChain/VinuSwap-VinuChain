@@ -66,91 +66,6 @@ function encodePriceSqrt(ratio : BigNumber){
   )
 }
 
-export default async function getPermitNFTSignature(
-    wallet,
-    positionManager,
-    spender: string,
-    tokenId,
-    deadline,
-    permitConfig
-    ) {
-    const [nonce, name, version, chainId] = await Promise.all([
-        permitConfig?.nonce ?? positionManager.positions(tokenId).then((p) => p.nonce),
-        permitConfig?.name ?? positionManager.name(),
-        permitConfig?.version ?? '1',
-        permitConfig?.chainId ?? wallet.getChainId(),
-    ])
-
-    return splitSignature(
-        await wallet._signTypedData(
-        {
-            name,
-            version,
-            chainId,
-            verifyingContract: positionManager.address,
-        },
-        {
-            Permit: [
-            {
-                name: 'spender',
-                type: 'address',
-            },
-            {
-                name: 'tokenId',
-                type: 'uint256',
-            },
-            {
-                name: 'nonce',
-                type: 'uint256',
-            },
-            {
-                name: 'deadline',
-                type: 'uint256',
-            },
-            ],
-        },
-        {
-            owner: wallet.address,
-            spender,
-            tokenId,
-            nonce,
-            deadline,
-        }
-        )
-    )
-    }
-
-const checkQuery = async (methodName : string, params : Array<any>, expected : Array<any>, referenceContract : ethers.Contract | undefined = undefined) => {
-    if (!referenceContract) {
-        referenceContract = poolContract
-    }
-
-    const serialize = x => {
-        if (Array.isArray(x)) {
-            return x.map(y => serialize(y))
-        }
-        if (typeof x == 'boolean') {
-            return x
-        }
-
-        if (x instanceof BigNumber) {
-            return x.toString()
-        }
-
-        return String(x)
-    }
-    let parsedExpected = serialize(expected)
-
-    if (parsedExpected.length == 1) {
-        parsedExpected = parsedExpected[0]
-    }
-
-    let actual = await referenceContract[methodName](...params)
-
-    actual = serialize(actual)
-
-    expect(await referenceContract[methodName](...params)).to.be.deep.equal(parsedExpected)
-}
 
 const newUsers = async (...tokenInfos : Array<Array<Array<String | Number>>>) => {
     const users : Array<any> = []
@@ -313,7 +228,7 @@ describe.only('test SDK', function () {
             it('Non-position getters', async function() {
                 await poolContract.initialize(encodePriceSqrt(BigNumber.from(342)))
                 await poolContract.setFeeProtocol(4, 4)
-                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
+                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                 expect(sdk.token0).to.be.equal(TOKEN_0)
                 expect(sdk.token1).to.be.equal(TOKEN_1)
                 expect(await sdk.factory()).to.be.equal(factoryContract.address)
@@ -340,7 +255,7 @@ describe.only('test SDK', function () {
 
                 console.log('Position manager:', positionManagerContract.address)
 
-                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
+                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                 const users = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
                 await sdk.connect(deployer).mint(0.001, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
                 
@@ -379,7 +294,7 @@ describe.only('test SDK', function () {
 
                     console.log('Position manager:', positionManagerContract.address)
 
-                    const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
+                    const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                     const users = await newUsers([])
                     await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
                     //await sdk.connect(deployer).mint(21, 532, MONE.div(10).toString(), MONE.div(10).toString(), 0, users[0].address, new Date(Date.now() + 1000000))
@@ -417,7 +332,7 @@ describe.only('test SDK', function () {
 
                     console.log('Position manager:', positionManagerContract.address)
 
-                    sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address)
+                    sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                     const users = await newUsers([], [], [])
                     alice = users[0]
                     bob = users[1]
