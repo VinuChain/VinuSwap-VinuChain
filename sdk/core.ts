@@ -15,8 +15,11 @@ import ERC20Abi from "./abi/ERC20.json";
 import { encodePrice, decodePrice, withCustomTickSpacing } from "./utils";
 import { BigNumber } from "@ethersproject/bignumber";
 
+// @ts-ignore
 import { Token } from "@uniswap/sdk-core";
+// @ts-ignore
 import { Percent } from "@uniswap/sdk-core/dist";
+// @ts-ignore
 import { TickMath, nearestUsableTick, Position, Pool } from "@uniswap/v3-sdk";
 import JSBI from "jsbi";
 
@@ -31,7 +34,7 @@ class VinuSwap {
   public positionManager: NonfungiblePositionManager;
   public token0Contract: ethers.Contract;
   public token1Contract: ethers.Contract;
-  public signer: ethers.Signer;
+  public signerOrProvider: ethers.Signer | ethers.providers.Provider;
   public _significantDigits: number = 18;
 
   private constructor(
@@ -44,7 +47,7 @@ class VinuSwap {
     positionManager: NonfungiblePositionManager,
     token0Contract: ethers.Contract,
     token1Contract: ethers.Contract,
-    signer: ethers.Signer
+    signerOrProvider: ethers.Signer | ethers.providers.Provider
   ) {
     this.token0 = token0;
     this.token1 = token1;
@@ -55,7 +58,7 @@ class VinuSwap {
     this.positionManager = positionManager;
     this.token0Contract = token0Contract;
     this.token1Contract = token1Contract;
-    this.signer = signer;
+    this.signerOrProvider = signerOrProvider;
   }
 
   public connect(signer: ethers.Signer): VinuSwap {
@@ -144,7 +147,7 @@ class VinuSwap {
       positionManager,
       token0Contract,
       token1Contract,
-      null
+      signerOrProvider
     );
   }
 
@@ -510,17 +513,9 @@ class VinuSwap {
     return tx
   }
 
-  public async decreaseLiquidty(): Promise<string> {
-    return "0";
-  }
-
   public async lock(nftId: string, lockedUntil: Date, deadline: Date): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.lock(nftId, Math.floor(lockedUntil.getTime() / 1000), Math.ceil(deadline.getTime() / 1000));
     return tx;
-  }
-
-  public async collectProtocol(): Promise<string> {
-    return "0";
   }
 }
 

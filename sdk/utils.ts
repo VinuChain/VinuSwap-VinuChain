@@ -1,8 +1,7 @@
 import { BigNumber } from "@ethersproject/bignumber"
-import { BigintIsh, Token } from "@uniswap/sdk-core"
-import { FeeAmount, Pool, Position, TICK_SPACINGS, Tick, TickConstructorArgs, TickDataProvider } from "@uniswap/v3-sdk"
+// @ts-ignore
+import { TICK_SPACINGS } from "@uniswap/v3-sdk"
 import bn from 'bignumber.js'
-import JSBI from "jsbi"
 
 
 
@@ -24,12 +23,17 @@ function decodePrice(price : BigNumber) : string {
     .toString()
 }
 
-async function withCustomTickSpacing(fee, tickSpacing, f) {
+
+async function withCustomTickSpacing<T>(fee: number, tickSpacing: number, f: (() => Promise<T>) | (() => T)): Promise<T> {
+  // @ts-ignore
   const old_value = TICK_SPACINGS[fee]
+
+  // @ts-ignore
   TICK_SPACINGS[fee] = tickSpacing
 
   const result = await f()
 
+  // @ts-ignore
   TICK_SPACINGS[fee] = old_value
 
   return result
