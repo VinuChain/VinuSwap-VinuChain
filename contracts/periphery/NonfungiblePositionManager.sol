@@ -265,6 +265,33 @@ contract NonfungiblePositionManager is
         emit IncreaseLiquidity(params.tokenId, liquidity, amount0, amount1);
     }
 
+    function quoteTokensOwed(uint256 tokenId) external returns (uint128 tokensOwed0, uint128 tokensOwed1) {
+        Position memory position = _positions[tokenId];
+        require(position.poolId != 0, 'Invalid token ID');
+        PoolAddress.PoolKey memory poolKey = _poolIdToPoolKey[position.poolId];
+        IUniswapV3Pool pool = IUniswapV3Pool(PoolAddress.computeAddress(factory, poolKey));
+        bytes32 positionKey = PositionKey.compute(address(this), position.tickLower, position.tickUpper);
+    
+        pool.burn(position.tickLower, position.tickUpper, 0);
+        (, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, , ) = pool.positions(positionKey);
+        tokensOwed0 = position.tokensOwed0 +
+            uint128(
+                FullMath.mulDiv(
+                    feeGrowthInside0LastX128 - position.feeGrowthInside0LastX128,
+                    position.liquidity,
+                    FixedPoint128.Q128
+                )
+            );
+        tokensOwed1 = position.tokensOwed1 +
+            uint128(
+                FullMath.mulDiv(
+                    feeGrowthInside1LastX128 - position.feeGrowthInside1LastX128,
+                    position.liquidity,
+                    FixedPoint128.Q128
+                )
+            );
+    }
+
     /// @inheritdoc INonfungiblePositionManager
     function decreaseLiquidity(DecreaseLiquidityParams calldata params)
         external
