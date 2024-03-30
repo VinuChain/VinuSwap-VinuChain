@@ -1,14 +1,26 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity =0.7.6;
 
-import '@uniswap/v3-core/contracts/interfaces/IERC20Minimal.sol';
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
-contract TestERC20 is IERC20Minimal {
+contract TestERC20 is IERC20 {
     mapping(address => uint256) public override balanceOf;
     mapping(address => mapping(address => uint256)) public override allowance;
 
     constructor(uint256 amountToMint) {
         mint(msg.sender, amountToMint);
+    }
+
+    function symbol() public view returns (string memory) {
+        return "TEST";
+    }
+
+    function decimals() public view returns (uint8) {
+        return 18;
+    }
+
+    function totalSupply() public view override returns (uint256) {
+        return 0;
     }
 
     function mint(address to, uint256 amount) public {
