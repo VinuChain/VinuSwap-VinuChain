@@ -413,6 +413,50 @@ describe.only('test SDK', function () {
                         })
                     })
                 })
+
+                describe('increaseLiquidity', function() {
+                    it('increases liquidity', async function() {
+                        await token0Contract.connect(alice).mint(MONE.div(10))
+                        await token0Contract.connect(alice).approve(positionManagerContract.address, MONE.div(10))
+                        await token1Contract.connect(alice).mint(MONE.div(10))
+                        await token1Contract.connect(alice).approve(positionManagerContract.address, MONE.div(10))
+
+                        expect(await sdk.positionAmount0('1')).to.be.equal('999999999999999999')
+                        expect(await sdk.positionAmount1('1')).to.be.equal('714776854860176759')
+
+                        const quote = await sdk.quoteIncreaseLiquidity('1', MONE.div(10).toString(), MONE.div(10).toString())
+                        expect(quote[0]).to.be.equal('99999999999999999')
+                        expect(quote[1]).to.be.equal('71477685486017676')
+
+                        await sdk.connect(alice).increaseLiquidity('1', MONE.div(10).toString(), MONE.div(10).toString(), '0', '0', new Date(Date.now() + 1000000))
+
+                        // 999999999999999999 (~1 ETH) + 99999999999999999 (~0.1 ETH) = 1099999999999999998 (~1.1 ETH)
+                        expect(await sdk.positionAmount0('1')).to.be.equal('1099999999999999998')
+                        // 714776854860176759 (~0.714 ETH) + 71477685486017676 (~0.0714 ETH) = 786254540346194435 (~0.786 ETH)
+                        expect(await sdk.positionAmount1('1')).to.be.equal('786254540346194435')
+                    })
+                })
+
+                describe.only('decreaseLiquidity', function() {
+                    it('decreases liquidity', async function() {
+                        expect(await sdk.positionAmount0('1')).to.be.equal('999999999999999999')
+                        expect(await sdk.positionAmount1('1')).to.be.equal('714776854860176759')
+
+                        const liquidityReduction = (await sdk.positionLiquidity('1')).div(10)
+
+                        const quote = await sdk.quoteDecreaseLiquidity('1', liquidityReduction.toString())
+                        expect(quote[0]).to.be.equal('100000000000000000')
+                        expect(quote[1]).to.be.equal('71477685486017676')
+
+                        // Only Charlie & his operators can decrease liquidity
+                        await sdk.connect(charlie).decreaseLiquidity('1', liquidityReduction.toString(), '0', '0', new Date(Date.now() + 1000000))
+
+                        // 999999999999999999 (~1 ETH) - 100000000000000000 (~0.1 ETH) = 899999999999999999 (~0.9 ETH)
+                        expect(await sdk.positionAmount0('1')).to.be.equal('899999999999999999')
+                        // 714776854860176759 (~0.715 ETH) - 71477685486017676 (~0.0715 ETH) = 643299169374159083 (~0.643 ETH)
+                        expect(await sdk.positionAmount1('1')).to.be.equal('643299169374159083')
+                    })
+                })
                 
                 describe('lock', function() {
                     it('locks a position', async function() {

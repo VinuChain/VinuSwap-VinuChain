@@ -239,9 +239,9 @@ class VinuSwap {
     });
   }
 
-  /*public async liquidity(nftId: string): Promise<BigNumber> {
+  public async positionLiquidity(nftId: string): Promise<BigNumber> {
     return (await this.positionManager.positions(nftId)).liquidity;
-  }*/
+  }
 
   public async positionLockedUntil(nftId: string): Promise<Date> {
     return new Date(
@@ -511,6 +511,65 @@ class VinuSwap {
     })
 
     return tx
+  }
+
+  public async quoteIncreaseLiquidity(nftId: string, amount0Desired: string, amount1Desired: string): Promise<[string, string]> {
+    return withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
+      const oldPositionRaw = await this.positionManager.positions(nftId);
+      const oldPosition = new Position({
+        pool: await this.asUniswapPool(),
+        liquidity: oldPositionRaw.liquidity.toString(),
+        tickLower: oldPositionRaw.tickLower,
+        tickUpper: oldPositionRaw.tickUpper
+      });
+
+      const amount0 = oldPosition.amount0.numerator.toString();
+      const amount1 = oldPosition.amount1.numerator.toString();
+
+      const newPosition = Position.fromAmounts({
+        pool: await this.asUniswapPool(),
+        tickLower: oldPositionRaw.tickLower,
+        tickUpper: oldPositionRaw.tickUpper,
+        amount0: BigNumber.from(amount0).add(BigNumber.from(amount0Desired)).toString(),
+        amount1: BigNumber.from(amount1).add(BigNumber.from(amount1Desired)).toString(),
+        useFullPrecision: true
+      });
+
+      return [newPosition.amount0.subtract(oldPosition.amount0).numerator.toString(), newPosition.amount1.subtract(oldPosition.amount1).numerator.toString()];
+    });
+  }
+
+  public async decreaseLiquidity(nftId: string, liquidity: string, amount0Min: string, amount1Min: string, deadline: Date): Promise<ethers.ContractTransaction> {
+    const tx = await this.positionManager.decreaseLiquidity({
+      tokenId: nftId,
+      liquidity,
+      amount0Min,
+      amount1Min,
+      deadline: Math.ceil(deadline.getTime() / 1000)
+    })
+
+    return tx
+  }
+
+  public async quoteDecreaseLiquidity(nftId: string, liquidity: string): Promise<[string, string]> {
+    return withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
+      const oldPositionRaw = await this.positionManager.positions(nftId);
+      const oldPosition = new Position({
+        pool: await this.asUniswapPool(),
+        liquidity: oldPositionRaw.liquidity.toString(),
+        tickLower: oldPositionRaw.tickLower,
+        tickUpper: oldPositionRaw.tickUpper
+      });
+
+      const newPosition = new Position( {
+        pool: await this.asUniswapPool(),
+        liquidity: oldPositionRaw.liquidity.sub(liquidity).toString(),
+        tickLower: oldPositionRaw.tickLower,
+        tickUpper: oldPositionRaw.tickUpper
+      });
+
+      return [oldPosition.amount0.subtract(newPosition.amount0).numerator.toString(), oldPosition.amount1.subtract(newPosition.amount1).numerator.toString()];
+    });
   }
 
   public async lock(nftId: string, lockedUntil: Date, deadline: Date): Promise<ethers.ContractTransaction> {
