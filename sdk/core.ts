@@ -149,11 +149,11 @@ class VinuSwap {
   }
 
   public async balance0(): Promise<BigNumber> {
-    return this.token0Contract.balanceOf(this.pool.address);
+    return await this.token0Contract.balanceOf(this.pool.address);
   }
 
   public async balance1(): Promise<BigNumber> {
-    return this.token1Contract.balanceOf(this.pool.address);
+    return await this.token1Contract.balanceOf(this.pool.address);
   }
 
   public async poolfee(): Promise<number> {
