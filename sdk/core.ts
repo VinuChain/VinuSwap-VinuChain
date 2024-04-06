@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import { ethers, BigNumberish } from "ethers";
 
 import { VinuSwapPool } from "../typechain-types/contracts/core/VinuSwapPool";
 import { SwapRouter } from "../typechain-types/contracts/periphery/SwapRouter";
@@ -167,11 +167,11 @@ class VinuSwap {
     return 1 / ((await this.pool.slot0()).feeProtocol >> 4);
   }
 
-  public async balance0(): Promise<string> {
+  public async balance0(): Promise<BigNumber> {
     return this.token0Contract.balanceOf(this.pool.address);
   }
 
-  public async balance1(): Promise<string> {
+  public async balance1(): Promise<BigNumber> {
     return this.token1Contract.balanceOf(this.pool.address);
   }
 
@@ -179,7 +179,7 @@ class VinuSwap {
     return decodePrice((await this.pool.slot0()).sqrtPriceX96);
   }
 
-  public async availableProtocolFees(): Promise<[ethers.BigNumber, ethers.BigNumber]> {
+  public async availableProtocolFees(): Promise<[BigNumber, BigNumber]> {
     const protocolFees = await this.pool.protocolFees();
     return [protocolFees.token0, protocolFees.token1];
   }
@@ -201,11 +201,11 @@ class VinuSwap {
     );
   }
 
-  public async positionOperator(nftId: string): Promise<string> {
+  public async positionOperator(nftId: BigNumberish): Promise<string> {
     return (await this.positionManager.positions(nftId)).operator;
   }
 
-  public async positionPriceBounds(nftId: string): Promise<[string, string]> {
+  public async positionPriceBounds(nftId: BigNumberish): Promise<[string, string]> {
     return await withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
         const position = new Position({
             pool: await this.asUniswapPool(),
@@ -218,7 +218,7 @@ class VinuSwap {
     });
   }
 
-  public async positionAmount0(nftId: string): Promise<string> {
+  public async positionAmount0(nftId: BigNumberish): Promise<string> {
     return await withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
         const position = new Position({
             pool: await this.asUniswapPool(),
@@ -231,7 +231,7 @@ class VinuSwap {
     });
   }
 
-  public async positionAmount1(nftId: string): Promise<string> {
+  public async positionAmount1(nftId: BigNumberish): Promise<string> {
     return await withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
         const position = new Position({
             pool: await this.asUniswapPool(),
@@ -244,11 +244,11 @@ class VinuSwap {
     });
   }
 
-  public async positionLiquidity(nftId: string): Promise<BigNumber> {
+  public async positionLiquidity(nftId: BigNumberish): Promise<BigNumber> {
     return (await this.positionManager.positions(nftId)).liquidity;
   }
 
-  public async positionLockedUntil(nftId: string): Promise<Date> {
+  public async positionLockedUntil(nftId: BigNumberish): Promise<Date> {
     return new Date(
       parseInt(
         (await this.positionManager.positions(nftId)).lockedUntil.toString()
@@ -256,7 +256,7 @@ class VinuSwap {
     );
   }
 
-  public async positionIsLocked(nftId: string): Promise<boolean> {
+  public async positionIsLocked(nftId: BigNumberish): Promise<boolean> {
     return (
       parseInt(
         (await this.positionManager.positions(nftId)).lockedUntil.toString()
@@ -266,23 +266,23 @@ class VinuSwap {
     );
   }
 
-  public async positionTokenURI(nftId: string): Promise<string> {
+  public async positionTokenURI(nftId: BigNumberish): Promise<string> {
     return this.positionManager.tokenURI(nftId);
   }
 
-  public async positionTokensOwed(nftId: string): Promise<[BigNumber, BigNumber]> {
+  public async positionTokensOwed(nftId: BigNumberish): Promise<[BigNumber, BigNumber]> {
     return await this.positionManager.callStatic.quoteTokensOwed(nftId);
   }
 
-  public async positionOwner(nftId: string): Promise<string> {
+  public async positionOwner(nftId: BigNumberish): Promise<string> {
     return (await this.positionManager.ownerOf(nftId));
   }
 
   public async mint(
     ratioLower: number,
     ratioUpper: number,
-    amount0Desired: string,
-    amount1Desired: string,
+    amount0Desired: BigNumberish,
+    amount1Desired: BigNumberish,
     slippageRatio: number,
     recipient: string,
     deadline: Date
@@ -315,8 +315,8 @@ class VinuSwap {
         pool,
         tickLower,
         tickUpper,
-        amount0: amount0Desired,
-        amount1: amount1Desired,
+        amount0: amount0Desired.toString(),
+        amount1: amount1Desired.toString(),
         useFullPrecision: true,
       });
 
@@ -347,9 +347,9 @@ class VinuSwap {
   public async quoteMint(
     ratioLower: number,
     ratioUpper: number,
-    amount0Desired: string,
-    amount1Desired: string
-  ): Promise<[string, string]> {
+    amount0Desired: BigNumberish,
+    amount1Desired: BigNumberish
+  ): Promise<[BigNumber, BigNumber]> {
     return await withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
       const sqrtRatioX96Lower = encodePrice(ratioLower.toString());
       const sqrtRatioX96Upper = encodePrice(ratioUpper.toString());
@@ -376,19 +376,19 @@ class VinuSwap {
         pool,
         tickLower,
         tickUpper,
-        amount0: amount0Desired,
-        amount1: amount1Desired,
+        amount0: amount0Desired.toString(),
+        amount1: amount1Desired.toString(),
         useFullPrecision: true,
       });
 
-      return [position.amount0.numerator.toString(), position.amount1.numerator.toString()];
+      return [BigNumber.from(position.amount0.numerator.toString()), BigNumber.from(position.amount1.numerator.toString())];
     });
   }
 
   public async quoteExactInput(
     tokenIn: string,
     tokenOut: string,
-    amountIn: string
+    amountIn: BigNumberish
   ) {
     if (tokenIn != this.token0 && tokenIn != this.token1) {
       throw new Error("TokenIn address does not match");
@@ -416,8 +416,8 @@ class VinuSwap {
   public async swapExactInput(
     tokenIn: string,
     tokenOut: string,
-    amountIn: string,
-    amountOutMinimum: string,
+    amountIn: BigNumberish,
+    amountOutMinimum: BigNumberish,
     recipient: string,
     deadline: Date
   ): Promise<ethers.ContractTransaction> {
@@ -447,7 +447,7 @@ class VinuSwap {
   public async quoteExactOutput(
     tokenIn: string,
     tokenOut: string,
-    amountOut: string
+    amountOut: BigNumberish
   ) {
     if (tokenIn != this.token0 && tokenIn != this.token1) {
       throw new Error("TokenIn address does not match");
@@ -505,7 +505,7 @@ class VinuSwap {
     return "0";
   }
 
-  public async collect(nftId: string, recipient: string, amount0Max: string, amount1Max: string): Promise<ethers.ContractTransaction> {
+  public async collect(nftId: BigNumberish, recipient: string, amount0Max: BigNumberish, amount1Max: BigNumberish): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.collect({
       tokenId: nftId,
       recipient,
@@ -516,7 +516,7 @@ class VinuSwap {
     return tx
   }
 
-  public async collectProtocol(recipient: string, amount0Requested: string, amount1Requested: string): Promise<ethers.ContractTransaction> {
+  public async collectProtocol(recipient: string, amount0Requested: BigNumberish, amount1Requested: BigNumberish): Promise<ethers.ContractTransaction> {
     const tx = await this.pool.collectProtocol(
       recipient,
       amount0Requested,
@@ -526,7 +526,7 @@ class VinuSwap {
     return tx
   }
 
-  public async increaseLiquidity(nftId: string, amount0Desired: string, amount1Desired: string, amount0Min: string, amount1Min: string, deadline: Date): Promise<ethers.ContractTransaction> {
+  public async increaseLiquidity(nftId: BigNumberish, amount0Desired: BigNumberish, amount1Desired: BigNumberish, amount0Min: BigNumberish, amount1Min: BigNumberish, deadline: Date): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.increaseLiquidity({
       tokenId: nftId,
       amount0Desired,
@@ -539,7 +539,7 @@ class VinuSwap {
     return tx
   }
 
-  public async quoteIncreaseLiquidity(nftId: string, amount0Desired: string, amount1Desired: string): Promise<[string, string]> {
+  public async quoteIncreaseLiquidity(nftId: BigNumberish, amount0Desired: BigNumberish, amount1Desired: BigNumberish): Promise<[BigNumber, BigNumber]> {
     return withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
       const oldPositionRaw = await this.positionManager.positions(nftId);
       const oldPosition = new Position({
@@ -561,11 +561,14 @@ class VinuSwap {
         useFullPrecision: true
       });
 
-      return [newPosition.amount0.subtract(oldPosition.amount0).numerator.toString(), newPosition.amount1.subtract(oldPosition.amount1).numerator.toString()];
+      return [
+        BigNumber.from(newPosition.amount0.subtract(oldPosition.amount0).numerator.toString()),
+        BigNumber.from(newPosition.amount1.subtract(oldPosition.amount1).numerator.toString())
+      ];
     });
   }
 
-  public async decreaseLiquidity(nftId: string, liquidity: string, amount0Min: string, amount1Min: string, deadline: Date): Promise<ethers.ContractTransaction> {
+  public async decreaseLiquidity(nftId: BigNumberish, liquidity: string, amount0Min: BigNumberish, amount1Min: BigNumberish, deadline: Date): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.decreaseLiquidity({
       tokenId: nftId,
       liquidity,
@@ -577,7 +580,7 @@ class VinuSwap {
     return tx
   }
 
-  public async quoteDecreaseLiquidity(nftId: string, liquidity: string): Promise<[string, string]> {
+  public async quoteDecreaseLiquidity(nftId: BigNumberish, liquidity: BigNumberish): Promise<[BigNumber, BigNumber]> {
     return withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
       const oldPositionRaw = await this.positionManager.positions(nftId);
       const oldPosition = new Position({
@@ -594,11 +597,14 @@ class VinuSwap {
         tickUpper: oldPositionRaw.tickUpper
       });
 
-      return [oldPosition.amount0.subtract(newPosition.amount0).numerator.toString(), oldPosition.amount1.subtract(newPosition.amount1).numerator.toString()];
+      return [
+        BigNumber.from(oldPosition.amount0.subtract(newPosition.amount0).numerator.toString()),
+        BigNumber.from(oldPosition.amount1.subtract(newPosition.amount1).numerator.toString())
+      ];
     });
   }
 
-  public async lock(nftId: string, lockedUntil: Date, deadline: Date): Promise<ethers.ContractTransaction> {
+  public async lock(nftId: BigNumberish, lockedUntil: Date, deadline: Date): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.lock(nftId, Math.floor(lockedUntil.getTime() / 1000), Math.ceil(deadline.getTime() / 1000));
     return tx;
   }
