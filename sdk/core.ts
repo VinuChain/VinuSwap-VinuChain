@@ -38,18 +38,14 @@ class VinuSwap {
   public _significantDigits: number = 18;
 
   private constructor(
-    token0: string,
-    token1: string,
     pool: VinuSwapPool,
+    token0Contract: ethers.Contract,
+    token1Contract: ethers.Contract,
     quoter: VinuSwapQuoter,
     router: SwapRouter,
     positionManager: NonfungiblePositionManager,
-    token0Contract: ethers.Contract,
-    token1Contract: ethers.Contract,
     signerOrProvider: ethers.Signer | ethers.providers.Provider
   ) {
-    this.token0 = token0;
-    this.token1 = token1;
     this.pool = pool;
     this.quoter = quoter;
     this.router = router;
@@ -61,14 +57,12 @@ class VinuSwap {
 
   public connect(signer: ethers.Signer): VinuSwap {
     return new VinuSwap(
-      this.token0,
-      this.token1,
       this.pool.connect(signer),
+      this.token0Contract.connect(signer),
+      this.token1Contract.connect(signer),
       this.quoter.connect(signer),
       this.router.connect(signer),
       this.positionManager.connect(signer),
-      this.token0Contract.connect(signer),
-      this.token1Contract.connect(signer),
       signer
     );
   }
@@ -128,14 +122,12 @@ class VinuSwap {
     );
 
     return new VinuSwap(
-      token0Address,
-      token1Address,
       pool,
+      token0Contract,
+      token1Contract,
       quoter,
       router,
       positionManager,
-      token0Contract,
-      token1Contract,
       signerOrProvider
     );
   }
@@ -185,8 +177,8 @@ class VinuSwap {
     // We could also retrieve the true token names from the contracts,
     // but it's unnecessary and slows down the process
     return new Pool(
-      new Token(chainId, this.token0, token0Decimals, "Token0"),
-      new Token(chainId, this.token1, token1Decimals, "Token1"),
+      new Token(chainId, this.token0Contract.address, token0Decimals, "Token0"),
+      new Token(chainId, this.token1Contract.address, token1Decimals, "Token1"),
       await this.poolfee(),
       slot0.sqrtPriceX96.toString(),
       (await this.pool.liquidity()).toString(),
@@ -320,8 +312,8 @@ class VinuSwap {
 
     const tx = await this.positionManager.mint(
       {
-        token0: this.token0,
-        token1: this.token1,
+        token0: this.token0Contract.address,
+        token1: this.token1Contract.address,
         fee: await this.poolfee(),
         tickLower,
         tickUpper,
@@ -383,10 +375,10 @@ class VinuSwap {
     tokenOut: string,
     amountIn: BigNumberish
   ) {
-    if (tokenIn != this.token0 && tokenIn != this.token1) {
+    if (tokenIn != this.token0Contract.address && tokenIn != this.token1Contract.address) {
       throw new Error("TokenIn address does not match");
     }
-    if (tokenOut != this.token0 && tokenOut != this.token1) {
+    if (tokenOut != this.token0Contract.address && tokenOut != this.token1Contract.address) {
       throw new Error("TokenOut address does not match");
     }
     if (tokenIn == tokenOut) {
@@ -414,10 +406,10 @@ class VinuSwap {
     recipient: string,
     deadline: Date
   ): Promise<ethers.ContractTransaction> {
-    if (tokenIn != this.token0 && tokenIn != this.token1) {
+    if (tokenIn != this.token0Contract.address && tokenIn != this.token1Contract.address) {
       throw new Error("TokenIn address does not match");
     }
-    if (tokenOut != this.token0 && tokenOut != this.token1) {
+    if (tokenOut != this.token0Contract.address && tokenOut != this.token1Contract.address) {
       throw new Error("TokenOut address does not match");
     }
     if (tokenIn == tokenOut) {
@@ -442,10 +434,10 @@ class VinuSwap {
     tokenOut: string,
     amountOut: BigNumberish
   ) {
-    if (tokenIn != this.token0 && tokenIn != this.token1) {
+    if (tokenIn != this.token0Contract.address && tokenIn != this.token1Contract.address) {
       throw new Error("TokenIn address does not match");
     }
-    if (tokenOut != this.token0 && tokenOut != this.token1) {
+    if (tokenOut != this.token0Contract.address && tokenOut != this.token1Contract.address) {
       throw new Error("TokenOut address does not match");
     }
     if (tokenIn == tokenOut) {
@@ -471,10 +463,10 @@ class VinuSwap {
     recipient: string,
     deadline: Date
   ): Promise<ethers.ContractTransaction> {
-    if (tokenIn != this.token0 && tokenIn != this.token1) {
+    if (tokenIn != this.token0Contract.address && tokenIn != this.token1Contract.address) {
       throw new Error("TokenIn address does not match");
     }
-    if (tokenOut != this.token0 && tokenOut != this.token1) {
+    if (tokenOut != this.token0Contract.address && tokenOut != this.token1Contract.address) {
       throw new Error("TokenOut address does not match");
     }
     if (tokenIn == tokenOut) {

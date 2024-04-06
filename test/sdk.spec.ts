@@ -229,8 +229,8 @@ describe.only('test SDK', function () {
                 await poolContract.initialize(encodePriceSqrt(BigNumber.from(342)))
                 await poolContract.setFeeProtocol(4, 4)
                 const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
-                expect(sdk.token0).to.be.equal(TOKEN_0)
-                expect(sdk.token1).to.be.equal(TOKEN_1)
+                expect(sdk.token0Contract.address).to.be.equal(TOKEN_0)
+                expect(sdk.token1Contract.address).to.be.equal(TOKEN_1)
                 expect(await sdk.factory()).to.be.equal(factoryContract.address)
                 expect(await sdk.unlocked()).to.be.true
                 expect(await sdk.protocolShare0()).to.be.equal(0.25)
