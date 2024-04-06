@@ -40,7 +40,6 @@ class VinuSwap {
   private constructor(
     token0: string,
     token1: string,
-    fee: number,
     pool: VinuSwapPool,
     quoter: VinuSwapQuoter,
     router: SwapRouter,
@@ -51,7 +50,6 @@ class VinuSwap {
   ) {
     this.token0 = token0;
     this.token1 = token1;
-    this.fee = fee;
     this.pool = pool;
     this.quoter = quoter;
     this.router = router;
@@ -65,7 +63,6 @@ class VinuSwap {
     return new VinuSwap(
       this.token0,
       this.token1,
-      this.fee,
       this.pool.connect(signer),
       this.quoter.connect(signer),
       this.router.connect(signer),
@@ -79,7 +76,6 @@ class VinuSwap {
   public static async create(
     tokenA: string,
     tokenB: string,
-    fee: number,
     poolAddress: string,
     quoterAddress: string,
     routerAddress: string,
@@ -114,12 +110,6 @@ class VinuSwap {
       throw new Error("TokenB address does not match");
     }
 
-    const poolFee = await pool.fee();
-
-    if (fee != poolFee) {
-      throw new Error("Fee does not match");
-    }
-
     const positionManager = new ethers.Contract(
       positionManagerAddress,
       NonfungiblePositionManagerInfo.abi,
@@ -140,7 +130,6 @@ class VinuSwap {
     return new VinuSwap(
       token0Address,
       token1Address,
-      poolFee,
       pool,
       quoter,
       router,
@@ -175,6 +164,10 @@ class VinuSwap {
     return this.token1Contract.balanceOf(this.pool.address);
   }
 
+  public async poolfee(): Promise<number> {
+    return await this.pool.fee();
+  }
+
   public async price(): Promise<string> {
     return decodePrice((await this.pool.slot0()).sqrtPriceX96);
   }
@@ -194,7 +187,7 @@ class VinuSwap {
     return new Pool(
       new Token(chainId, this.token0, token0Decimals, "Token0"),
       new Token(chainId, this.token1, token1Decimals, "Token1"),
-      this.fee,
+      await this.poolfee(),
       slot0.sqrtPriceX96.toString(),
       (await this.pool.liquidity()).toString(),
       slot0.tick
@@ -206,7 +199,7 @@ class VinuSwap {
   }
 
   public async positionPriceBounds(nftId: BigNumberish): Promise<[string, string]> {
-    return await withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
+    return await withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
         const position = new Position({
             pool: await this.asUniswapPool(),
             liquidity: (await this.positionManager.positions(nftId)).liquidity.toString(),
@@ -219,7 +212,7 @@ class VinuSwap {
   }
 
   public async positionAmount0(nftId: BigNumberish): Promise<string> {
-    return await withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
+    return await withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
         const position = new Position({
             pool: await this.asUniswapPool(),
             liquidity: (await this.positionManager.positions(nftId)).liquidity.toString(),
@@ -232,7 +225,7 @@ class VinuSwap {
   }
 
   public async positionAmount1(nftId: BigNumberish): Promise<string> {
-    return await withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
+    return await withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
         const position = new Position({
             pool: await this.asUniswapPool(),
             liquidity: (await this.positionManager.positions(nftId)).liquidity.toString(),
@@ -308,7 +301,7 @@ class VinuSwap {
 
     let slippageBounds: any;
 
-    await withCustomTickSpacing(this.fee, tickSpacing, async () => {
+    await withCustomTickSpacing(await this.poolfee(), tickSpacing, async () => {
       const pool = await this.asUniswapPool();
 
       const position = Position.fromAmounts({
@@ -329,7 +322,7 @@ class VinuSwap {
       {
         token0: this.token0,
         token1: this.token1,
-        fee: this.fee,
+        fee: await this.poolfee(),
         tickLower,
         tickUpper,
         amount0Desired,
@@ -350,7 +343,7 @@ class VinuSwap {
     amount0Desired: BigNumberish,
     amount1Desired: BigNumberish
   ): Promise<[BigNumber, BigNumber]> {
-    return await withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
+    return await withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
       const sqrtRatioX96Lower = encodePrice(ratioLower.toString());
       const sqrtRatioX96Upper = encodePrice(ratioUpper.toString());
 
@@ -403,7 +396,7 @@ class VinuSwap {
     const quote = await this.quoter.callStatic.quoteExactInputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
-      fee: this.fee,
+      fee: await this.poolfee(),
       amountIn,
       sqrtPriceLimitX96: 0
     })
@@ -434,7 +427,7 @@ class VinuSwap {
     const tx = await this.router.exactInputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
-      fee: this.fee,
+      fee: await this.poolfee(),
       amountIn,
       amountOutMinimum,
       recipient,
@@ -462,7 +455,7 @@ class VinuSwap {
     const quote = await this.quoter.callStatic.quoteExactOutputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
-      fee: this.fee,
+      fee: await this.poolfee(),
       amount: amountOut, // Note that the nomenclature is different here compared to quoteExactInput
       sqrtPriceLimitX96: 0
     })
@@ -491,7 +484,7 @@ class VinuSwap {
     let tx = await this.router.exactOutputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
-      fee: this.fee,
+      fee: await this.poolfee(),
       amountOut,
       amountInMaximum,
       recipient,
@@ -540,7 +533,7 @@ class VinuSwap {
   }
 
   public async quoteIncreaseLiquidity(nftId: BigNumberish, amount0Desired: BigNumberish, amount1Desired: BigNumberish): Promise<[BigNumber, BigNumber]> {
-    return withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
+    return withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
       const oldPositionRaw = await this.positionManager.positions(nftId);
       const oldPosition = new Position({
         pool: await this.asUniswapPool(),
@@ -581,7 +574,7 @@ class VinuSwap {
   }
 
   public async quoteDecreaseLiquidity(nftId: BigNumberish, liquidity: BigNumberish): Promise<[BigNumber, BigNumber]> {
-    return withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
+    return withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
       const oldPositionRaw = await this.positionManager.positions(nftId);
       const oldPosition = new Position({
         pool: await this.asUniswapPool(),

@@ -228,7 +228,7 @@ describe.only('test SDK', function () {
             it('Non-position getters', async function() {
                 await poolContract.initialize(encodePriceSqrt(BigNumber.from(342)))
                 await poolContract.setFeeProtocol(4, 4)
-                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                 expect(sdk.token0).to.be.equal(TOKEN_0)
                 expect(sdk.token1).to.be.equal(TOKEN_1)
                 expect(await sdk.factory()).to.be.equal(factoryContract.address)
@@ -255,7 +255,7 @@ describe.only('test SDK', function () {
 
                 console.log('Position manager:', positionManagerContract.address)
 
-                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                 const users = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
                 await sdk.connect(deployer).mint(0.001, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
                 
@@ -294,7 +294,7 @@ describe.only('test SDK', function () {
 
                     console.log('Position manager:', positionManagerContract.address)
 
-                    const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+                    const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                     const users = await newUsers([])
                     await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
 
@@ -328,7 +328,7 @@ describe.only('test SDK', function () {
 
                     console.log('Position manager:', positionManagerContract.address)
 
-                    sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+                    sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                     const users = await newUsers([], [], [])
                     alice = users[0]
                     bob = users[1]
