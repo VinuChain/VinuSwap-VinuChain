@@ -278,8 +278,6 @@ class VinuSwap {
     return (await this.positionManager.ownerOf(nftId));
   }
 
-  // TODO: collect, burn, mint, increaseLiquidity, decreaseLiquidity, lock, collectProtocol, swaps
-
   public async mint(
     ratioLower: number,
     ratioUpper: number,
@@ -308,32 +306,10 @@ class VinuSwap {
       throw new Error("Invalid tick range");
     }
 
-    /*console.log("Tick range:", tickLower, tickUpper);
-    console.log("Tick spacing:", tickSpacing);
-    console.log(
-      "Tick range % tick spacing:",
-      (tickUpper - tickLower) % tickSpacing
-    );*/
-
     let slippageBounds: any;
 
     await withCustomTickSpacing(this.fee, tickSpacing, async () => {
-      /*const pool = new Pool(
-        new Token(0, this.token0, 18, "A"),
-        new Token(0, this.token1, 18, "B"),
-        this.fee,
-        (await this.pool.slot0()).sqrtPriceX96.toString(),
-        liquidity.toString(),
-        (await this.pool.slot0()).tick
-      );*/
       const pool = await this.asUniswapPool();
-      /*console.log("Current liquidity: " + liquidity.toString());
-      console.log("Current tick: " + (await this.pool.slot0()).tick.toString());
-      console.log("Current price: " + (await this.price()).toString());
-      console.log("Balance 0: " + (await this.balance0()));
-      console.log("Balance 1: " + (await this.balance1()));
-      console.log(tickLower >= TickMath.MIN_TICK);
-      console.log(tickLower % pool.tickSpacing === 0);*/
 
       const position = Position.fromAmounts({
         pool,
@@ -348,12 +324,6 @@ class VinuSwap {
         new Percent(Math.floor(slippageRatio * 10_000), 10_000)
       );
     });
-
-    /*console.log("Slippage bounds:");
-    console.log("Amount 0: " + slippageBounds.amount0.toString());
-    console.log("Amount 1: " + slippageBounds.amount1.toString());
-
-    console.log("Current tick: " + (await this.pool.slot0()).tick.toString());*/
 
     const tx = await this.positionManager.mint(
       {
@@ -372,6 +342,47 @@ class VinuSwap {
       //{ gasLimit: 1000000 }
     );
     return tx;
+  }
+
+  public async quoteMint(
+    ratioLower: number,
+    ratioUpper: number,
+    amount0Desired: string,
+    amount1Desired: string
+  ): Promise<[string, string]> {
+    return await withCustomTickSpacing(this.fee, await this.pool.tickSpacing(), async () => {
+      const sqrtRatioX96Lower = encodePrice(ratioLower.toString());
+      const sqrtRatioX96Upper = encodePrice(ratioUpper.toString());
+
+      let tickLower = TickMath.getTickAtSqrtRatio(
+        JSBI.BigInt(sqrtRatioX96Lower.toString())
+      );
+      let tickUpper = TickMath.getTickAtSqrtRatio(
+        JSBI.BigInt(sqrtRatioX96Upper.toString())
+      );
+
+      const tickSpacing = await this.pool.tickSpacing();
+
+      tickLower = nearestUsableTick(tickLower, tickSpacing);
+      tickUpper = nearestUsableTick(tickUpper, tickSpacing);
+
+      if (tickLower < TickMath.MIN_TICK || tickUpper > TickMath.MAX_TICK) {
+        throw new Error("Invalid tick range");
+      }
+
+      const pool = await this.asUniswapPool();
+
+      const position = Position.fromAmounts({
+        pool,
+        tickLower,
+        tickUpper,
+        amount0: amount0Desired,
+        amount1: amount1Desired,
+        useFullPrecision: true,
+      });
+
+      return [position.amount0.numerator.toString(), position.amount1.numerator.toString()];
+    });
   }
 
   public async quoteExactInput(

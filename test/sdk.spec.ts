@@ -297,18 +297,14 @@ describe.only('test SDK', function () {
                     const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, FEE, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                     const users = await newUsers([])
                     await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
-                    //await sdk.connect(deployer).mint(21, 532, MONE.div(10).toString(), MONE.div(10).toString(), 0, users[0].address, new Date(Date.now() + 1000000))
-                    //await sdk.connect(deployer).mint(21, 532, MONE.div(10).toString(), MONE.div(10).toString(), 0, users[0].address, new Date(Date.now() + 1000000))
-                    
-                    //await sdk.liquidity(1)
 
+                    const mintQuote = await sdk.quoteMint(0.1, 532, MONE.toString(), MONE.toString())
 
-                    /*await sdk.connect(deployer).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', users[0].address, new Date(Date.now() + 1000000))
-                    
-                    await sdk.connect(deployer).mint(0.001, 532, MONE.div(10).toString(), MONE.div(10).toString(), 0, users[0].address, new Date(Date.now() + 1000000))
-                    await sdk.connect(deployer).mint(0.001, 532, MONE.div(10).toString(), MONE.div(10).toString(), 0.999, users[0].address, new Date(Date.now() + 1000000))
-                    await checkQuery('balanceOf', [users[0].address], [3], positionManagerContract)
-                    */
+                    expect(mintQuote[0]).to.be.equal('999999999999999999')
+                    expect(mintQuote[1]).to.be.equal('714776854860176759')
+
+                    expect(await sdk.positionAmount0('1')).to.be.equal('999999999999999999')
+                    expect(await sdk.positionAmount1('1')).to.be.equal('714776854860176759')
                 })
             })
 
@@ -477,17 +473,6 @@ describe.only('test SDK', function () {
                         
                         console.log('Swapped.')
                         console.log('Pool address:', poolContract.address)
-
-                        //await positionManagerContract.connect(charlie).
-
-                        /*await token0Contract.connect(charlie).mint(MONE.div(10))
-                        await token0Contract.connect(charlie).approve(positionManagerContract.address, MONE.div(10))
-                        await token1Contract.connect(charlie).mint(MONE.div(10))
-                        await token1Contract.connect(charlie).approve(positionManagerContract.address, MONE.div(10))
-
-                        await sdk.connect(charlie).increaseLiquidity('1', MONE.div(10).toString(), MONE.div(10).toString(), '0', '0', new Date(Date.now() + 1000000))
-
-                        //await sdk.connect(charlie).collect('1', charlie.address, '0', '0')*/
 
 
                         expect((await sdk.positionTokensOwed('1'))[0]).to.be.equal('1875000000001')
