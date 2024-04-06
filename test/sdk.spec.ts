@@ -437,7 +437,7 @@ describe.only('test SDK', function () {
                     })
                 })
 
-                describe.only('decreaseLiquidity', function() {
+                describe('decreaseLiquidity', function() {
                     it('decreases liquidity', async function() {
                         expect(await sdk.positionAmount0('1')).to.be.equal('999999999999999999')
                         expect(await sdk.positionAmount1('1')).to.be.equal('714776854860176759')
@@ -501,6 +501,31 @@ describe.only('test SDK', function () {
                         expect(await token0Contract.balanceOf(charlie.address)).to.be.equal('1875000000001')
                         expect(await token1Contract.balanceOf(charlie.address)).to.be.equal('0')
 
+                    })
+                })
+
+                describe('collectProtocol', function() {
+                    it('collects protocol fees', async function() {
+                        const initialDeployerBalance0 = await token0Contract.balanceOf(deployer.address)
+                        const initialDeployerBalance1 = await token1Contract.balanceOf(deployer.address)
+
+                        // Start with a swap
+                        await token0Contract.connect(alice).mint(MONE.div(10))
+                        await token0Contract.connect(alice).approve(routerContract.address, MONE.div(10))
+                        await sdk.connect(alice).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', bob.address, new Date(Date.now() + 1000000))
+                        
+                        console.log('Swapped.')
+
+                        const protocolFees = await sdk.availableProtocolFees()
+                        expect(protocolFees[0]).to.be.equal('624999999999')
+                        expect(protocolFees[1]).to.be.equal('0')
+
+                        await sdk.connect(deployer).collectProtocol(deployer.address, '624999999999', '0')
+
+                        // Due to Uniswaps's gas savings hacks, if you try to collect exactly the amount
+                        // of protocol fees, you will get 1 wei less
+                        expect((await token0Contract.balanceOf(deployer.address)).sub(initialDeployerBalance0)).to.be.equal('624999999998')
+                        expect((await token1Contract.balanceOf(deployer.address)).sub(initialDeployerBalance1)).to.be.equal('0')
                     })
                 })
             })

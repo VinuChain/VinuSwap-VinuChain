@@ -179,6 +179,11 @@ class VinuSwap {
     return decodePrice((await this.pool.slot0()).sqrtPriceX96);
   }
 
+  public async availableProtocolFees(): Promise<[ethers.BigNumber, ethers.BigNumber]> {
+    const protocolFees = await this.pool.protocolFees();
+    return [protocolFees.token0, protocolFees.token1];
+  }
+
   protected async asUniswapPool(): Promise<Pool> {
     const slot0 = await this.pool.slot0();
     const token0Decimals = await this.token0Contract.decimals();
@@ -496,6 +501,16 @@ class VinuSwap {
       amount0Max,
       amount1Max
     })
+
+    return tx
+  }
+
+  public async collectProtocol(recipient: string, amount0Requested: string, amount1Requested: string): Promise<ethers.ContractTransaction> {
+    const tx = await this.pool.collectProtocol(
+      recipient,
+      amount0Requested,
+      amount1Requested
+    )
 
     return tx
   }
