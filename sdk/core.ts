@@ -24,8 +24,6 @@ import { TickMath, nearestUsableTick, Position, Pool } from "@uniswap/v3-sdk";
 import JSBI from "jsbi";
 
 class VinuSwap {
-  public token0: string;
-  public token1: string;
   public fee: number;
   public pool: VinuSwapPool;
   public quoter: VinuSwapQuoter;
