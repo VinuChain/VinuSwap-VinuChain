@@ -308,6 +308,46 @@ describe('test SDK', function () {
                 })
             })
 
+            describe('positionIdsByOwner', function() {
+                it('returns the position IDs owned by an address', async function() {
+                    await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
+                    await poolContract.setFeeProtocol(4, 4)
+
+                    await token0Contract.connect(deployer).mint(MONE.mul(2000))
+                    await token1Contract.connect(deployer).mint(MONE.mul(2000))
+
+                    await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+                    await token1Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+
+                    await token0Contract.connect(deployer).approve(routerContract.address, MONE.mul(1000))
+                    await token1Contract.connect(deployer).approve(routerContract.address, MONE.mul(1000))
+
+                    console.log('Position manager:', positionManagerContract.address)
+
+                    // Deployer mints 1 and 2 to Alice, 3 to Bob, 4 to Alice again
+                    const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+
+                    const [alice, bob] = await newUsers([], [])
+
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, alice.address, new Date(Date.now() + 1000000))
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, alice.address, new Date(Date.now() + 1000000))
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, bob.address, new Date(Date.now() + 1000000))
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, alice.address, new Date(Date.now() + 1000000))
+
+                    const alicePositions = await sdk.positionIdsByOwner(alice.address)
+                    expect(alicePositions).to.be.an('array')
+                    expect(alicePositions).to.have.lengthOf(3)
+                    expect(alicePositions[0]).to.be.equal(BigNumber.from('1'))
+                    expect(alicePositions[1]).to.be.equal(BigNumber.from('2'))
+                    expect(alicePositions[2]).to.be.equal(BigNumber.from('4'))
+
+                    const bobPositions = await sdk.positionIdsByOwner(bob.address)
+                    expect(bobPositions).to.be.an('array')
+                    expect(bobPositions).to.have.lengthOf(1)
+                    expect(bobPositions[0]).to.be.equal(BigNumber.from('3'))
+                })
+            })
+
             describe('operations with liquidity', function() {
                 let sdk : VinuSwap
                 let alice: any

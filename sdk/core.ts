@@ -231,6 +231,25 @@ class VinuSwap {
   }
 
   /**
+   * Retrieves the NFT IDs of all positions owned by a given address.
+   * @param owner The address of the owner
+   * @returns An array containing the NFT IDs of the positions
+   */
+  public async positionIdsByOwner(owner: string): Promise<BigNumber[]> {
+    const numPositions = await this.positionManager.balanceOf(owner);
+
+    const promises = []
+
+    for (let i = BigNumber.from(0); i.lt(numPositions); i = i.add(1)) {
+      promises.push(
+        this.positionManager.tokenOfOwnerByIndex(owner, i)
+      );
+    }
+
+    return await Promise.all(promises);
+  }
+
+  /**
    * The operator, if any, of a given position.
    * @param nftId The NFT ID of the position
    * @returns The operator address. If no operator is set, returns the zero address
