@@ -55,6 +55,11 @@ class VinuSwap {
     this.signerOrProvider = signerOrProvider;
   }
 
+  /**
+   * Connects the signer to the VinuSwap instance
+   * @param signer Signer to connect 
+   * @returns The same VinuSwap instance with the signer connected
+   */
   public connect(signer: ethers.Signer): VinuSwap {
     return new VinuSwap(
       this.pool.connect(signer),
@@ -67,6 +72,18 @@ class VinuSwap {
     );
   }
 
+  /**
+   * Creates a new VinuSwap instance.
+   * Important: tokenA and tokenB are not necessarily the same as token0 and token1
+   * @param tokenA Address of one token
+   * @param tokenB Address of the other token
+   * @param poolAddress Address of the VinuSwap pool
+   * @param quoterAddress Address of the VinuSwap quoter
+   * @param routerAddress Address of the VinuSwap router
+   * @param positionManagerAddress Address of the VinuSwap position manager
+   * @param signerOrProvider Signer or provider to use
+   * @returns A new VinuSwap instance
+   */
   public static async create(
     tokenA: string,
     tokenB: string,
@@ -132,38 +149,65 @@ class VinuSwap {
     );
   }
 
-  public async unlocked(): Promise<boolean> {
-    return (await this.pool.slot0()).unlocked;
+  /**
+   * Whether the pool is locked.
+   */
+  public async locked(): Promise<boolean> {
+    return !(await this.pool.slot0()).unlocked;
   }
 
+  /**
+   * The address of the factory that created the pool.
+   */
   public async factory(): Promise<string> {
     return this.pool.factory();
   }
 
+  /**
+   * A floating point number representing the share of the token0 protocol fees that go to the protocol.
+   */
   public async protocolShare0(): Promise<number> {
     return 1 / ((await this.pool.slot0()).feeProtocol % 16);
   }
 
+  /**
+   * A floating point number representing the share of the token1 protocol fees that go to the protocol.
+   */
   public async protocolShare1(): Promise<number> {
     return 1 / ((await this.pool.slot0()).feeProtocol >> 4);
   }
 
+  /**
+   * The token0 balance of the pool.
+   */
   public async balance0(): Promise<BigNumber> {
     return await this.token0Contract.balanceOf(this.pool.address);
   }
 
+  /**
+   * The token1 balance of the pool.
+   */
   public async balance1(): Promise<BigNumber> {
     return await this.token1Contract.balanceOf(this.pool.address);
   }
 
+  /**
+   * The fee of the pool, expressed in bips (0.01%).
+   */
   public async poolfee(): Promise<number> {
     return await this.pool.fee();
   }
 
+  /**
+   * The ratio between token1 and token0 price.
+   */
   public async price(): Promise<string> {
     return decodePrice((await this.pool.slot0()).sqrtPriceX96);
   }
 
+  /**
+   * How much fee the protocol has collected.
+   */
   public async availableProtocolFees(): Promise<[BigNumber, BigNumber]> {
     const protocolFees = await this.pool.protocolFees();
     return [protocolFees.token0, protocolFees.token1];
@@ -186,9 +230,15 @@ class VinuSwap {
     );
   }
 
+  /**
+   * The operator, if any, of a given position.
+   * @param nftId The NFT ID of the position
+   * @returns The operator address. If no operator is set, returns the zero address
+   */
   public async positionOperator(nftId: BigNumberish): Promise<string> {
     return (await this.positionManager.positions(nftId)).operator;
   }
+
 
   public async positionPriceBounds(nftId: BigNumberish): Promise<[string, string]> {
     return await withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
@@ -203,7 +253,12 @@ class VinuSwap {
     });
   }
 
-  public async positionAmount0(nftId: BigNumberish): Promise<string> {
+  /**
+   * The amount of token0 in a given position.
+   * @param nftId The NFT ID of the position
+   * @returns The amount of token0
+   */
+  public async positionAmount0(nftId: BigNumberish): Promise<BigNumber> {
     return await withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
         const position = new Position({
             pool: await this.asUniswapPool(),
@@ -212,11 +267,16 @@ class VinuSwap {
             tickUpper: (await this.positionManager.positions(nftId)).tickUpper
         });
 
-        return position.amount0.numerator.toString();
+        return BigNumber.from(position.amount0.numerator.toString());
     });
   }
 
-  public async positionAmount1(nftId: BigNumberish): Promise<string> {
+  /**
+   * The amount of token1 in a given position.
+   * @param nftId The NFT ID of the position
+   * @returns The amount of token1
+   */
+  public async positionAmount1(nftId: BigNumberish): Promise<BigNumber> {
     return await withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
         const position = new Position({
             pool: await this.asUniswapPool(),
@@ -225,15 +285,32 @@ class VinuSwap {
             tickUpper: (await this.positionManager.positions(nftId)).tickUpper
         });
 
-        return position.amount1.numerator.toString();
+        return BigNumber.from(position.amount1.numerator.toString());
     });
   }
 
+  /**
+   * The liquidity of a given position. Note: this is an internal number used by VinuSwap,
+   * and is not the same as the amount of token0 or token1 in the position. 
+   * @param nftId The NFT ID of the position
+   * @returns The liquidity
+   */
   public async positionLiquidity(nftId: BigNumberish): Promise<BigNumber> {
     return (await this.positionManager.positions(nftId)).liquidity;
   }
 
-  public async positionLockedUntil(nftId: BigNumberish): Promise<Date> {
+  /**
+   * The date until a given position is locked. If the position is not locked, returns a date in the past.
+   * @param nftId The NFT ID of the position
+   * @returns The date until the position is locked. If the position has never been locked, returns null.
+   */
+  public async positionLockedUntil(nftId: BigNumberish): Promise<Date | null> {
+    const lockedUntil = (await this.positionManager.positions(nftId)).lockedUntil.toString();
+
+    if (lockedUntil == "0") {
+      return null;
+    }
+
     return new Date(
       parseInt(
         (await this.positionManager.positions(nftId)).lockedUntil.toString()
@@ -241,6 +318,11 @@ class VinuSwap {
     );
   }
 
+  /**
+   * Whether a given position is locked.
+   * @param nftId The NFT ID of the position
+   * @returns True if the position is locked, false otherwise
+   */
   public async positionIsLocked(nftId: BigNumberish): Promise<boolean> {
     return (
       parseInt(
@@ -251,18 +333,44 @@ class VinuSwap {
     );
   }
 
+  /**
+   * The tokenURI of a given position.
+   * @param nftId The NFT ID of the position
+   * @returns The tokenURI
+   */
   public async positionTokenURI(nftId: BigNumberish): Promise<string> {
     return this.positionManager.tokenURI(nftId);
   }
 
+  /**
+   * The tokens owed to the position owner.
+   * @param nftId The NFT ID of the position
+   * @returns A tuple containing the amount of token0 and token1 owed to the position owner
+   */
   public async positionTokensOwed(nftId: BigNumberish): Promise<[BigNumber, BigNumber]> {
     return await this.positionManager.callStatic.quoteTokensOwed(nftId);
   }
 
+  /**
+   * The owner of a given position.
+   * @param nftId The NFT ID of the position
+   * @returns The owner address
+   */
   public async positionOwner(nftId: BigNumberish): Promise<string> {
     return (await this.positionManager.ownerOf(nftId));
   }
 
+  /**
+   * Mint a new position in the pool.
+   * @param ratioLower The lowest price ratio at which the position will provide liquidity
+   * @param ratioUpper The highest price ratio at which the position will provide liquidity
+   * @param amount0Desired How much token0 to provide. Note: this is not the final amount of token0 in the position
+   * @param amount1Desired How much token1 to provide. Note: this is not the final amount of token1 in the position
+   * @param slippageRatio A number between 0 and 1 representing the maximum slippage ratio
+   * @param recipient Who will receive the NFT
+   * @param deadline Deadline for the transaction
+   * @returns The mint transaction
+   */
   public async mint(
     ratioLower: number,
     ratioUpper: number,
@@ -329,6 +437,14 @@ class VinuSwap {
     return tx;
   }
 
+  /**
+   * Quote the amount of token0 and token1 that will be minted in a new position.
+   * @param ratioLower The lowest price ratio at which the position will provide liquidity
+   * @param ratioUpper The highest price ratio at which the position will provide liquidity
+   * @param amount0Desired How much token0 to provide. Note: this is not the final amount of token0 in the position
+   * @param amount1Desired How much token1 to provide. Note: this is not the final amount of token1 in the position
+   * @returns A tuple containing the amount of token0 and token1 that will be minted
+   */
   public async quoteMint(
     ratioLower: number,
     ratioUpper: number,
@@ -370,6 +486,13 @@ class VinuSwap {
     });
   }
 
+  /**
+   * Quote the amount obtained by swapping with a given amount of tokenIn.
+   * @param tokenIn The address of the token to swap
+   * @param tokenOut The address of the token to receive
+   * @param amountIn The amount of tokenIn to swap
+   * @returns The amount of tokenOut that will be received
+   */
   public async quoteExactInput(
     tokenIn: string,
     tokenOut: string,
@@ -393,11 +516,19 @@ class VinuSwap {
       sqrtPriceLimitX96: 0
     })
 
-    console.log('Obtained exact input quote: ', quote.amountOut.toString())
-
     return quote.amountOut.toString()
   }
 
+  /**
+   * Swap a given amount of tokenIn for tokenOut.
+   * @param tokenIn The address of the token to swap
+   * @param tokenOut The address of the token to receive
+   * @param amountIn The amount of tokenIn to swap
+   * @param amountOutMinimum The minimum amount of tokenOut to receive
+   * @param recipient The address that will receive the tokenOut
+   * @param deadline The deadline for the transaction
+   * @returns The swap transaction
+   */
   public async swapExactInput(
     tokenIn: string,
     tokenOut: string,
@@ -429,6 +560,13 @@ class VinuSwap {
     return tx;
   }
 
+  /**
+   * Quote the amount of tokenIn needed to obtain a given amount of tokenOut.
+   * @param tokenIn The address of the token to swap
+   * @param tokenOut The address of the token to receive
+   * @param amountOut The amount of tokenOut to receive
+   * @returns The amount of tokenIn needed
+   */
   public async quoteExactOutput(
     tokenIn: string,
     tokenOut: string,
@@ -455,6 +593,16 @@ class VinuSwap {
     return quote.amountIn.toString()
   }
 
+  /**
+   * Swap tokenIn for a given amount of tokenOut.
+   * @param tokenIn The address of the token to swap
+   * @param tokenOut The address of the token to receive
+   * @param amountOut The amount of tokenOut to receive
+   * @param amountInMaximum The maximum amount of tokenIn to swap
+   * @param recipient The address that will receive the tokenOut
+   * @param deadline The deadline for the transaction
+   * @returns The swap transaction
+   */
   public async swapExactOutput(
     tokenIn: string,
     tokenOut: string,
@@ -490,6 +638,14 @@ class VinuSwap {
     return "0";
   }
 
+  /**
+   * Collect the fees owed to the position owner.
+   * @param nftId The NFT ID of the position
+   * @param recipient The address that will receive the fees
+   * @param amount0Max The maximum amount of token0 to collect
+   * @param amount1Max The maximum amount of token1 to collect
+   * @returns The collect transaction
+   */
   public async collect(nftId: BigNumberish, recipient: string, amount0Max: BigNumberish, amount1Max: BigNumberish): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.collect({
       tokenId: nftId,
@@ -501,6 +657,13 @@ class VinuSwap {
     return tx
   }
 
+  /**
+   * Collect the protocol fees.
+   * @param recipient The address that will receive the fees
+   * @param amount0Requested The amount of token0 to collect
+   * @param amount1Requested The amount of token1 to collect
+   * @returns The collect transaction
+   */
   public async collectProtocol(recipient: string, amount0Requested: BigNumberish, amount1Requested: BigNumberish): Promise<ethers.ContractTransaction> {
     const tx = await this.pool.collectProtocol(
       recipient,
@@ -511,6 +674,16 @@ class VinuSwap {
     return tx
   }
 
+  /**
+   * Increase the liquidity of a given position.
+   * @param nftId The NFT ID of the position
+   * @param amount0Desired The desired amount of token0 to add. Note: this is not the final amount of token0 that will be added
+   * @param amount1Desired The desired amount of token1 to add. Note: this is not the final amount of token1 that will be added
+   * @param amount0Min The minimum amount of token0 to add
+   * @param amount1Min The minimum amount of token1 to add
+   * @param deadline The deadline for the transaction
+   * @returns The liquidity increase transaction
+   */
   public async increaseLiquidity(nftId: BigNumberish, amount0Desired: BigNumberish, amount1Desired: BigNumberish, amount0Min: BigNumberish, amount1Min: BigNumberish, deadline: Date): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.increaseLiquidity({
       tokenId: nftId,
@@ -524,6 +697,13 @@ class VinuSwap {
     return tx
   }
 
+  /**
+   * Quote the amount of token0 and token1 that will be added to a given position.
+   * @param nftId The NFT ID of the position
+   * @param amount0Desired The desired amount of token0 to add. Note: this is not the final amount of token0 that will be added
+   * @param amount1Desired The desired amount of token1 to add. Note: this is not the final amount of token1 that will be added
+   * @returns A tuple containing the amount of token0 and token1 that will be added
+   */
   public async quoteIncreaseLiquidity(nftId: BigNumberish, amount0Desired: BigNumberish, amount1Desired: BigNumberish): Promise<[BigNumber, BigNumber]> {
     return withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
       const oldPositionRaw = await this.positionManager.positions(nftId);
@@ -553,6 +733,15 @@ class VinuSwap {
     });
   }
 
+  /**
+   * Decrease the liquidity of a given position.
+   * @param nftId The NFT ID of the position
+   * @param liquidity The amount of liquidity to remove
+   * @param amount0Min The minimum amount of token0 to remove
+   * @param amount1Min The minimum amount of token1 to remove
+   * @param deadline The deadline for the transaction
+   * @returns The liquidity decrease transaction
+   */
   public async decreaseLiquidity(nftId: BigNumberish, liquidity: string, amount0Min: BigNumberish, amount1Min: BigNumberish, deadline: Date): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.decreaseLiquidity({
       tokenId: nftId,
@@ -565,6 +754,12 @@ class VinuSwap {
     return tx
   }
 
+  /**
+   * Quote the amount of token0 and token1 that will be removed from a given position.
+   * @param nftId The NFT ID of the position
+   * @param liquidity The amount of liquidity to remove
+   * @returns A tuple containing the amount of token0 and token1 that will be removed
+   */
   public async quoteDecreaseLiquidity(nftId: BigNumberish, liquidity: BigNumberish): Promise<[BigNumber, BigNumber]> {
     return withCustomTickSpacing(await this.poolfee(), await this.pool.tickSpacing(), async () => {
       const oldPositionRaw = await this.positionManager.positions(nftId);
@@ -589,6 +784,13 @@ class VinuSwap {
     });
   }
 
+  /**
+   * Lock a given position until a certain date.
+   * @param nftId The NFT ID of the position
+   * @param lockedUntil The date until the position will be locked
+   * @param deadline The deadline for the transaction
+   * @returns The lock transaction
+   */
   public async lock(nftId: BigNumberish, lockedUntil: Date, deadline: Date): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.lock(nftId, Math.floor(lockedUntil.getTime() / 1000), Math.ceil(deadline.getTime() / 1000));
     return tx;

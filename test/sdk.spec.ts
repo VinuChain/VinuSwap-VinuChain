@@ -232,7 +232,7 @@ describe.only('test SDK', function () {
                 expect(sdk.token0Contract.address).to.be.equal(TOKEN_0)
                 expect(sdk.token1Contract.address).to.be.equal(TOKEN_1)
                 expect(await sdk.factory()).to.be.equal(factoryContract.address)
-                expect(await sdk.unlocked()).to.be.true
+                expect(await sdk.locked()).to.be.false
                 expect(await sdk.protocolShare0()).to.be.equal(0.25)
                 expect(await sdk.protocolShare1()).to.be.equal(0.25)
                 expect(await sdk.balance0()).to.be.equal('0')
