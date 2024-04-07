@@ -10,7 +10,6 @@ hre.tracer.enabled = false
 
 import { ethers } from "hardhat"
 import { time } from "@nomicfoundation/hardhat-network-helpers"
-import { splitSignature } from 'ethers/lib/utils'
 
 import VinuSwap from '../sdk/core'
 
@@ -228,9 +227,10 @@ describe('test SDK', function () {
             it('Non-position getters', async function() {
                 await poolContract.initialize(encodePriceSqrt(BigNumber.from(342)))
                 await poolContract.setFeeProtocol(4, 4)
-                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
-                expect(sdk.token0Contract.address).to.be.equal(TOKEN_0)
-                expect(sdk.token1Contract.address).to.be.equal(TOKEN_1)
+                // TOKEN_0 and TOKEN_1 are swapped
+                const sdk = await VinuSwap.create(TOKEN_1, TOKEN_0, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+                expect(sdk.token0Address).to.be.equal(TOKEN_0)
+                expect(sdk.token1Address).to.be.equal(TOKEN_1)
                 expect(await sdk.factory()).to.be.equal(factoryContract.address)
                 expect(await sdk.locked()).to.be.false
                 expect(await sdk.protocolShare0()).to.be.equal(0.25)

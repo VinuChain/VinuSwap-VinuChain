@@ -146,6 +146,14 @@ class VinuSwap {
     );
   }
 
+  get token0Address(): string {
+    return this.token0Contract.address;
+  }
+
+  get token1Address(): string {
+    return this.token1Contract.address;
+  }
+
   /**
    * Whether the pool is locked.
    */
