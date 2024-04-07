@@ -683,7 +683,7 @@ class VinuSwap {
       throw new Error("TokenIn and TokenOut addresses are the same");
     }
 
-    let tx = await this.router.exactOutputSingle({
+    const tx = await this.router.exactOutputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
       fee: await this.poolFee(),
