@@ -634,8 +634,15 @@ class VinuSwap {
     return tx;
   }
 
-  public async burn(): Promise<string> {
-    return "0";
+  /**
+   * Burn a given position.
+   * Note: this transaction cannot be called if the position has outstanding liquidity
+   * or fees to collect.
+   * @param nftId The NFT ID of the position
+   * @returns The burn transaction
+   */
+  public async burn(nftId: BigNumberish): Promise<ethers.Transaction> {
+    return await this.positionManager.burn(nftId);
   }
 
   /**
@@ -735,6 +742,8 @@ class VinuSwap {
 
   /**
    * Decrease the liquidity of a given position.
+   * Note: the liquidity isn't transferred directly to the position owner,
+   * but is instead added to the fees to be collected by the owner.
    * @param nftId The NFT ID of the position
    * @param liquidity The amount of liquidity to remove
    * @param amount0Min The minimum amount of token0 to remove
@@ -742,7 +751,7 @@ class VinuSwap {
    * @param deadline The deadline for the transaction
    * @returns The liquidity decrease transaction
    */
-  public async decreaseLiquidity(nftId: BigNumberish, liquidity: string, amount0Min: BigNumberish, amount1Min: BigNumberish, deadline: Date): Promise<ethers.ContractTransaction> {
+  public async decreaseLiquidity(nftId: BigNumberish, liquidity: BigNumberish, amount0Min: BigNumberish, amount1Min: BigNumberish, deadline: Date): Promise<ethers.ContractTransaction> {
     const tx = await this.positionManager.decreaseLiquidity({
       tokenId: nftId,
       liquidity,

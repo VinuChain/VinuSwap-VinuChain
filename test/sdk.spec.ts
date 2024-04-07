@@ -93,7 +93,7 @@ const newUsers = async (...tokenInfos : Array<Array<Array<String | Number>>>) =>
 }
 
 
-describe.only('test SDK', function () {
+describe('test SDK', function () {
     before(async function() {
         this.timeout(0)
 
@@ -451,6 +451,27 @@ describe.only('test SDK', function () {
                         expect(await sdk.positionAmount0('1')).to.be.equal('899999999999999999')
                         // 714776854860176759 (~0.715 ETH) - 71477685486017676 (~0.0715 ETH) = 643299169374159083 (~0.643 ETH)
                         expect(await sdk.positionAmount1('1')).to.be.equal('643299169374159083')
+                    })
+                })
+
+                describe('burn', function() {
+                    it('burns a position', async function() {
+                        expect(await sdk.positionAmount0('1')).to.be.equal('999999999999999999')
+                        expect(await sdk.positionAmount1('1')).to.be.equal('714776854860176759')
+
+                        const liquidity = await sdk.positionLiquidity('1')
+
+                        await sdk.connect(charlie).decreaseLiquidity('1', liquidity.toString(), '0', '0', new Date(Date.now() + 1000000))
+
+                        await sdk.connect(charlie).collect('1', charlie.address, MONE.toString(), MONE.toString())
+
+                        console.log('Current liquidity:', await sdk.positionLiquidity('1'))
+
+                        await sdk.connect(charlie).burn('1')
+
+                        // Check that Charlie received the tokens
+                        expect(await token0Contract.balanceOf(charlie.address)).to.be.equal('999999999999999999')
+                        expect(await token1Contract.balanceOf(charlie.address)).to.be.equal('714776854860176759')
                     })
                 })
                 
