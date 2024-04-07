@@ -266,7 +266,7 @@ describe('test SDK', function () {
                 expect(await sdk.positionAmount1('1')).to.be.equal(MONE.sub(1).toString())
                 expect(await sdk.positionAmount1('1')).to.be.equal(BigNumber.from(await sdk.balance1()).sub(1).toString())
                 expect(await sdk.positionIsLocked('1')).to.be.false
-                expect((await sdk.positionLockedUntil('1')).getTime()).to.be.equal(0)
+                expect((await sdk.positionLockedUntil('1'))).to.be.null
                 expect(await sdk.positionOwner('1')).to.be.equal(users[0].address)
                 const [lower, upper] = await sdk.positionPriceBounds('1')
                 expect(parseFloat(lower)).to.be.approximately(0.001, 0.0001)
