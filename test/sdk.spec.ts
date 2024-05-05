@@ -11,7 +11,13 @@ hre.tracer.enabled = false
 import { ethers } from "hardhat"
 import { time } from "@nomicfoundation/hardhat-network-helpers"
 
+import { VinuEarnLPInitializable } from '../sdk/types/contracts/VinuEarnLPInitializable'
+import VinuEarnLPInitializableInfo from '../sdk/abi/vinu-earn/VinuEarnLPInitializable.json'
+
+import VinuEarnFactoryInfo from '../sdk/abi/vinu-earn/VinuEarnFactory.json'
+
 import VinuSwap from '../sdk/core'
+import VinuEarn from '../sdk/earn'
 
 chai.use(chaiAsPromised)
 const expect = chai.expect
@@ -572,6 +578,43 @@ describe('test SDK', function () {
                         // of protocol fees, you will get 1 wei less
                         expect((await token0Contract.balanceOf(deployer.address)).sub(initialDeployerBalance0)).to.be.equal('624999999998')
                         expect((await token1Contract.balanceOf(deployer.address)).sub(initialDeployerBalance1)).to.be.equal('0')
+                    })
+                })
+
+                describe('VinuEarn methods', function() {
+                    let vinuEarnContract : VinuEarnLPInitializable
+                    let earnSdk : VinuEarn
+                    beforeEach(async function() {
+                        const vinuEarnFactoryBlueprint = new ethers.ContractFactory(
+                            VinuEarnFactoryInfo.abi,
+                            VinuEarnFactoryInfo.bytecode,
+                            deployer
+                        )
+                        const vinuEarnFactoryContract = await vinuEarnFactoryBlueprint.deploy()
+
+                        const tx = await vinuEarnFactoryContract.deployLpPool(
+                            positionManagerContract.address,
+                            TOKEN_0,
+                            21,
+                            345,
+                            4535345,
+                            0,
+                            deployer.address
+                        )
+                        const receipt = await tx.wait()
+                        const vinuEarnAddress = receipt.events[2].args.vinuEarnLp
+                        // @ts-ignore
+                        vinuEarnContract = new ethers.Contract(vinuEarnAddress, VinuEarnLPInitializableInfo.abi, deployer) as VinuEarnLPInitializable
+
+                        earnSdk = new VinuEarn(vinuEarnAddress, deployer)
+                    })
+
+                    describe('deposit', function() {
+                        it('deposits', async function() {
+                            await positionManagerContract.connect(charlie).approve(vinuEarnContract.address, '1')
+                            await earnSdk.connect(charlie).deposit('1')
+                            expect(await vinuEarnContract.nftOwner('1')).to.be.equal(charlie.address)
+                        })
                     })
                 })
             })
