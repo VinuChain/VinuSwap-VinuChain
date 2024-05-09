@@ -68,6 +68,12 @@ export default{
         }
         
     },
+    paths: {
+        sources: "./contracts",
+        tests: "./test",
+        cache: "./cache",
+        artifacts: "./artifacts"
+    },
     allowUnlimitedContractSize: true,
     contractSizer: {
         runOnCompile: true
