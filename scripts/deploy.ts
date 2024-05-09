@@ -104,10 +104,12 @@ async function deployCommonContracts(accounts, shares, discountThresholds, disco
         accounts,
         shares
     )
+    console.log('Deployed controller contract to:', controllerContract.address)
 
     // 2. Deploy VinuSwapFactory
     const factoryBlueprint = await hre.ethers.getContractFactory('VinuSwapFactory')
     factoryContract = await factoryBlueprint.deploy()
+    console.log('Deployed factory contract to:', factoryContract.address)
 
     // 3. Transfer ownership of VinuSwapFactory to Controller
     await factoryContract.connect(deployer).setOwner(controllerContract.address)
@@ -115,6 +117,7 @@ async function deployCommonContracts(accounts, shares, discountThresholds, disco
     // 4. Deploy SwapRouter
     const routerBlueprint = await hre.ethers.getContractFactory('SwapRouter')
     routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
+    console.log('Deployed router contract to:', routerContract.address)
 
     // 5. Deploy NonfungibleTokenPositionDescriptor
 
@@ -132,6 +135,7 @@ async function deployCommonContracts(accounts, shares, discountThresholds, disco
         WETH,
         hre.ethers.utils.formatBytes32String('VinuSwap Position')
     )
+    console.log('Deployed position descriptor contract to:', positionDescriptorContract.address)
 
     // 6. Deploy NonfungiblePositionManager
     const positionManagerBlueprint = await hre.ethers.getContractFactory('NonfungiblePositionManager')
@@ -140,6 +144,7 @@ async function deployCommonContracts(accounts, shares, discountThresholds, disco
         WETH,
         positionDescriptorContract.address
     )
+    console.log('Deployed position manager contract to:', positionManagerContract.address)
 
     // 7. Deploy TieredDiscount
     const tieredDiscountBlueprint = await hre.ethers.getContractFactory('TieredDiscount')
@@ -239,7 +244,9 @@ async function testContract (minter, swapper, fee, controllerPayees) {
         amount1Max : UINT128_MAX
     }
 
-    await positionManagerContract.connect(minter).collect(collectParams)
+    //await positionManagerContract.connect(minter).collect(collectParams)
+    console.log('Token 0:', TOKEN_0)
+    console.log('Token 1:', TOKEN_1)
 
     // 4. Collect protocol fees
     await controllerContract.connect(deployer).collectProtocolFees(poolContract.address, UINT128_MAX, UINT128_MAX)
@@ -267,7 +274,11 @@ async function testContract (minter, swapper, fee, controllerPayees) {
 }
 
 async function main() {
-    const [, alice, bob, charlie, dan] = await ethers.getSigners()
+    const [deployer, alice, bob, charlie, dan] = await ethers.getSigners()
+
+    for (const account of [deployer, alice, bob, charlie, dan]) {
+        console.log('Account balance:', (await account.getBalance()).toString())
+    }
 
     const payeeAddresses = [alice.address, bob.address, charlie.address]
 
