@@ -616,6 +616,36 @@ describe('test SDK', function () {
                             expect(await vinuEarnContract.nftOwner('1')).to.be.equal(charlie.address)
                         })
                     })
+
+                    describe('withdraw', function() {
+                        it('withdraws', async function() {
+                            await positionManagerContract.connect(charlie).approve(vinuEarnContract.address, '1')
+                            await earnSdk.connect(charlie).deposit('1')
+                            await earnSdk.connect(charlie).withdraw('1')
+                            expect(await vinuEarnContract.nftOwner('1')).to.be.equal(ZERO_ADDRESS)
+                        })
+                    })
+
+                    describe.only('collectReward', function() {
+                        it('collects the reward', async function() {
+                            await positionManagerContract.connect(charlie).approve(vinuEarnContract.address, '1')
+                            await earnSdk.connect(charlie).deposit('1')
+                            await time.increase(1000)
+                            const pendingReward = await vinuEarnContract.pendingReward(charlie.address)
+                            expect(pendingReward).to.be.equal('10')
+                            await earnSdk.connect(charlie).collectReward()
+                            expect(await vinuEarnContract.nftOwner('1')).to.be.equal(charlie.address)
+                        })
+                    })
+
+                    describe('collectRevenue', function() {
+                        it('collects revenue', async function() {
+                            await positionManagerContract.connect(charlie).approve(vinuEarnContract.address, '1')
+                            await earnSdk.connect(charlie).deposit('1')
+                            await earnSdk.connect(charlie).collectRevenue('1', MONE, MONE)
+                            expect(await vinuEarnContract.nftOwner('1')).to.be.equal(charlie.address)
+                        })
+                    })
                 })
             })
         })
