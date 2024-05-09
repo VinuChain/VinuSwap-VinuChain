@@ -17,19 +17,24 @@ class VinuEarn {
         return new VinuEarn(this.vinuEarnContract.address, signerOrProvider);
     }
 
-    public async deposit(nftId: BigNumberish) {
+    public async deposit(nftId: BigNumberish) : Promise<ethers.ContractTransaction> {
         const tx = await this.vinuEarnContract.deposit(nftId)
         return tx;
     }
 
-    public async withdraw(nftId: BigNumberish) {
-
+    public async withdraw(nftId: BigNumberish) : Promise<ethers.ContractTransaction> {
+        const tx = await this.vinuEarnContract.withdraw(nftId)
+        return tx;
     }
 
-    public async collectReward(userAddress: string) {
+    public async collectReward() : Promise<ethers.ContractTransaction> {
+        const tx = await this.vinuEarnContract.collectReward()
+        return tx;
     }
 
     public async collectRevenue(nftId: BigNumberish, amount0Max: BigNumberish, amount1Max: BigNumberish) {
+        const tx = await this.vinuEarnContract.collectRevenue(nftId, amount0Max, amount1Max);
+        return tx;
     }
 }
 
