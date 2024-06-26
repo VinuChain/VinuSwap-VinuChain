@@ -3,12 +3,11 @@ pragma solidity ^0.7.0;
 
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '../core/interfaces/IFeeManager.sol';
-
-// TODO: Add docs
+import '@openzeppelin/contracts/access/Ownable.sol';
 
 /// @title Tiered Discount Fee Manager
 /// @notice Provides swap fee discounts depending on the token balance of the user
-contract TieredDiscount is IFeeManager {
+contract TieredDiscount is IFeeManager, Ownable {
     uint256 public constant DENOMINATOR = 10000;
 
     /// @notice The token to use for fee discounts
@@ -23,6 +22,13 @@ contract TieredDiscount is IFeeManager {
     /// @param _thresholds The thresholds for the discounts
     /// @param _discounts The discounts for the thresholds (in bips)
     constructor (address _token, uint256[] memory _thresholds, uint16[] memory _discounts) {
+        updateInfo(_token, _thresholds, _discounts);
+    }
+    /// @notice Contract constructor
+    /// @param _token The token to use for fee discounts
+    /// @param _thresholds The thresholds for the discounts
+    /// @param _discounts The discounts for the thresholds (in bips)
+    function updateInfo(address _token, uint256[] memory _thresholds, uint16[] memory _discounts) public onlyOwner() {
         require(_thresholds.length > 0, "Thresholds must not be empty");
         require(_thresholds.length == _discounts.length, "Thresholds and discounts must have the same length");
 

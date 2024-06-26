@@ -1713,7 +1713,164 @@ describe('test VinuSwapPool', function () {
             // 100.01% discount
             await expect(
                 tieredDiscountBlueprint.deploy(discountTokenContract.address, [100], [10001])
-            ).to.be.rejectedWith('Thresholds must be strictly increasing')
+            ).to.be.rejectedWith('Discounts must not be higher than 100%')
         })
+
+        describe('updating info', function () {
+            it('correctly updates fee tiers', async function () {
+                const discountTokenContract = await erc20Blueprint.deploy()
+
+                const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                    discountTokenContract.address,
+                    [40],
+                    [430]
+                )
+
+                await tieredDiscountContract.connect(deployer).updateInfo(
+                    discountTokenContract.address,
+                    [100],
+                    [10000]
+                )
+    
+                await checkQuery('computeFeeFor', [5000, deployer.address], [5000], tieredDiscountContract)
+                await discountTokenContract.connect(deployer).mint(150)
+                await checkQuery('computeFeeFor', [5000, deployer.address], [0], tieredDiscountContract)
+            })
+
+            it.only('correctly changes the discount token', async function () {
+                const discountTokenContract = await erc20Blueprint.deploy()
+                const newDiscountTokenContract = await erc20Blueprint.deploy()
+
+                const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                    discountTokenContract.address,
+                    [100],
+                    [10000]
+                )
+
+                await tieredDiscountContract.connect(deployer).updateInfo(
+                    newDiscountTokenContract.address,
+                    [100],
+                    [10000]
+                )
+                await checkQuery('computeFeeFor', [5000, deployer.address], [5000], tieredDiscountContract)
+                await newDiscountTokenContract.connect(deployer).mint(150)
+                await checkQuery('computeFeeFor', [5000, deployer.address], [0], tieredDiscountContract)
+            });
+            it('fails to update fee tiers without being the owner', async function () {
+                const [alice] = await newUsers([])
+                const discountTokenContract = await erc20Blueprint.deploy()
+
+                const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                    discountTokenContract.address,
+                    [40],
+                    [430]
+                )
+
+                await discountTokenContract.connect(deployer).mint(150)
+                await expect(
+                    tieredDiscountContract.connect(alice).updateInfo(
+                        discountTokenContract.address,
+                        [100],
+                        [10000]
+                    )
+                ).to.be.rejectedWith('Ownable: caller is not the owner')
+            })
+            it('fails to update fee tiers with 0 tiers', async function () {
+                const discountTokenContract = await erc20Blueprint.deploy()
+
+                const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                    discountTokenContract.address,
+                    [40],
+                    [430]
+                )
+
+                await discountTokenContract.connect(deployer).mint(150)
+                await expect(
+                    tieredDiscountContract.connect(deployer).updateInfo(
+                        discountTokenContract.address,
+                        [],
+                        []
+                    )
+                ).to.be.rejectedWith('Thresholds must not be empty')
+            })
+
+            it('fails to update fee tiers with different parameter lengths', async function () {
+                const discountTokenContract = await erc20Blueprint.deploy()
+
+                const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                    discountTokenContract.address,
+                    [40],
+                    [430]
+                )
+
+                await discountTokenContract.connect(deployer).mint(150)
+                await expect(
+                    tieredDiscountContract.connect(deployer).updateInfo(
+                        discountTokenContract.address,
+                        [100, 200],
+                        [1000]
+                    )
+                ).to.be.rejectedWith('Thresholds and discounts must have the same length')
+            })
+
+            it('fails to update fee tiers with non-increasing thresholds', async function () {
+                const discountTokenContract = await erc20Blueprint.deploy()
+
+                const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                    discountTokenContract.address,
+                    [40],
+                    [430]
+                )
+
+                await discountTokenContract.connect(deployer).mint(150)
+                await expect(
+                    tieredDiscountContract.connect(deployer).updateInfo(
+                        discountTokenContract.address,
+                        [100, 100, 101],
+                        [100, 200, 300]
+                    )
+                ).to.be.rejectedWith('Thresholds must be strictly increasing')
+            })
+
+            it('fails to update fee tiers with non-increasing discounts', async function () {
+                const discountTokenContract = await erc20Blueprint.deploy()
+
+                const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                    discountTokenContract.address,
+                    [40],
+                    [430]
+                )
+
+                await discountTokenContract.connect(deployer).mint(150)
+                await expect(
+                    tieredDiscountContract.connect(deployer).updateInfo(
+                        discountTokenContract.address,
+                        [100, 200, 300],
+                        [100, 100, 101]
+                    )
+                ).to.be.rejectedWith('Discounts must be strictly increasing')
+            })
+
+            it('fails to update fee tiers with a discount that is too high', async function () {
+                const discountTokenContract = await erc20Blueprint.deploy()
+
+                const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                    discountTokenContract.address,
+                    [40],
+                    [430]
+                )
+
+                await discountTokenContract.connect(deployer).mint(150)
+                await expect(
+                    tieredDiscountContract.connect(deployer).updateInfo(
+                        discountTokenContract.address,
+                        [100],
+                        [10001]
+                    )
+                ).to.be.rejectedWith('Discounts must not be higher than 100%')
+            })
+        })
+
+
     })
 })
