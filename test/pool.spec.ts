@@ -1231,6 +1231,237 @@ describe('test VinuSwapPool', function () {
                         controllerContract.connect(eric).setFeeProtocol(poolContract.address, 4, 5)
                     ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
                 })
+
+                describe('standard pool deployment', function () {
+                    it('sets the default fee manager', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+
+                        expect(await controllerContract.defaultFeeManager(factoryContract.address)).to.equal(noDiscountContract.address)
+                    })
+                    it('resets the default fee manager', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, ZERO_ADDRESS)
+
+                        expect(await controllerContract.defaultFeeManager(factoryContract.address)).to.equal(ZERO_ADDRESS)
+                    })
+                    it('fails to set the default fee manager without being the owner', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+
+                        const [eric] = await newUsers([])
+
+                        await expect(
+                            controllerContract.connect(eric).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
+                    })
+                    /*it('fails to set the default fee manager to a zero address', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        await expect(
+                            controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, ZERO_ADDRESS)
+                        ).to.be.eventually.rejectedWith('Fee manager must not be the zero address')
+                    })*/
+                    it('sets the default tick spacing', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+
+                        expect(await controllerContract.defaultTickSpacing(factoryContract.address, 200)).to.equal(60)
+                    })
+                    it('resets the default tick spacing', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 0)
+
+                        expect(await controllerContract.defaultTickSpacing(factoryContract.address, 200)).to.equal(0)
+                    })
+                    it('fails to set the default tick spacing without being the owner', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const [eric] = await newUsers([])
+
+                        await expect(
+                            controllerContract.connect(eric).setDefaultTickSpacing(factoryContract.address, 200, 60)
+                        ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
+                    })
+                    /*it('fails to set the default tick spacing to zero', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        await expect(
+                            controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 0)
+                        ).to.be.eventually.rejectedWith('Invalid tick spacing')
+                    })*/
+                    it('fails to set the default tick spacing to a value greater than 16384', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        await expect(
+                            controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 16384 + 1)
+                        ).to.be.eventually.rejectedWith('Invalid tick spacing')
+                    })
+                    it('fails to set the default tick spacing to a negative value', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        await expect(
+                            controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, -1)
+                        ).to.be.eventually.rejectedWith('Invalid tick spacing')
+                    })
+                    it('deploys a standard pool', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const [eric] = await newUsers([])
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+
+                        const tx = await controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+
+                        const contractAddress = (await tx.wait()).events[1].args.pool
+
+                        poolContract = poolContractBlueprint.attach(contractAddress)
+
+                        expect(await poolContract.token0()).to.equal(TOKEN_0)
+                        expect(await poolContract.token1()).to.equal(TOKEN_1)
+                        expect(await poolContract.fee()).to.equal(200)
+                        expect(await poolContract.tickSpacing()).to.equal(60)
+                        expect(await poolContract.feeManager()).to.equal(noDiscountContract.address)
+                    })
+                    it('fails to deploy a standard pool if the default fee manager is not set', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const [eric] = await newUsers([])
+
+                        //const noDiscountContract = await noDiscountBlueprint.deploy()
+                        //await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+
+                        await expect(
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        ).to.be.eventually.rejectedWith('Fee manager not set')
+                    })
+                    it('fails to deploy a standard pool if the default fee manager is set for the wrong factory', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const newFactoryContract = await factoryBlueprint.deploy()
+
+                        const [eric] = await newUsers([])
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+                        await controllerContract.connect(dan).setDefaultFeeManager(newFactoryContract.address, noDiscountContract.address)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+
+                        await expect(
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        ).to.be.eventually.rejectedWith('Fee manager not set')
+                    })
+                    it('fails to deploy a standard pool if the default tick spacing is not set', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const [eric] = await newUsers([])
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        //await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+
+                        await expect(
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        ).to.be.eventually.rejectedWith('Tick spacing not set')
+                    })
+                    it('fails to deploy a standard pool if the default tick spacing is set for the wrong factory', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const newFactoryContract = await factoryBlueprint.deploy()
+
+                        const [eric] = await newUsers([])
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(newFactoryContract.address, 200, 60)
+
+                        await expect(
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        ).to.be.eventually.rejectedWith('Tick spacing not set')
+                    })
+                    it('fails to deploy a standard pool if the default tick spacing is set for the wrong factory', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const [eric] = await newUsers([])
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 150, 60)
+
+                        await expect(
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        ).to.be.eventually.rejectedWith('Tick spacing not set')
+                    })
+                    it('fails to deploy a standard pool if neither the fee manager nor the tick spacing are set', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const [eric] = await newUsers([])
+
+                        //const noDiscountContract = await noDiscountBlueprint.deploy()
+                        //await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        //await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+
+                        await expect(
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        ).to.be.eventually.rejectedWith('Fee manager not set')
+                    })
+                    it('fails to deploy a standard pool if the fee manager has been reset', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const [eric] = await newUsers([])
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, ZERO_ADDRESS)
+
+                        await expect(
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        ).to.be.eventually.rejectedWith('Fee manager not set')
+                    })
+                    it('fails to deploy a standard pool if the tick spacing has been reset', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const [eric] = await newUsers([])
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 0)
+
+                        await expect(
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        ).to.be.eventually.rejectedWith('Tick spacing not set')
+                    })
+                    it('fails to deploy a standard pool if both the fee manager and the tick spacing have been reset', async function () {
+                        await factoryContract.setOwner(controllerContract.address)
+
+                        const [eric] = await newUsers([])
+
+                        const noDiscountContract = await noDiscountBlueprint.deploy()
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
+                        await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, ZERO_ADDRESS)
+                        await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 0)
+
+                        await expect(
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        ).to.be.eventually.rejectedWith('Fee manager not set')
+                    })
+                })
             })
         })
     })

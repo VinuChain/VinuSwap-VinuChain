@@ -79,6 +79,12 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @notice The accounts that have shares
     address[] public accounts;
 
+    /// @notice The default fee manager for each factory
+    mapping(address => address) public defaultFeeManager;
+    /// @notice The default tick spacing for each factory and fee
+    mapping(address => mapping(uint24 => int24)) public defaultTickSpacing;
+
+
     /// @notice Contract constructor
     /// @param _accounts The accounts that will receive fees
     /// @param _shares The number of shares owned by each account
@@ -114,6 +120,29 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @param tickSpacing The minimum number of ticks between valid price ticks
     /// @param feeManager The address of the fee manager
     /// @return pool The address of the created pool
+    function _createPoolInternal(
+        address factory,
+        address tokenA,
+        address tokenB,
+        uint24 fee,
+        int24 tickSpacing,
+        address feeManager
+    ) internal returns (address pool) {
+        (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        pool = IVinuSwapFactory(factory).createPool(token0, token1, fee, tickSpacing, feeManager);
+
+        emit PoolCreated(token0, token1, fee, factory, tickSpacing, feeManager, pool);
+    }
+
+    /// @notice Creates a new pool
+    /// @dev tokenA and tokenB might be switched, depending on their addresses
+    /// @param factory The factory used to create the pool
+    /// @param tokenA The first token of the pool
+    /// @param tokenB The second token of the pool
+    /// @param fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
+    /// @param tickSpacing The minimum number of ticks between valid price ticks
+    /// @param feeManager The address of the fee manager
+    /// @return pool The address of the created pool
     function createPool(
         address factory,
         address tokenA,
@@ -122,10 +151,47 @@ contract Controller is Ownable, ReentrancyGuard {
         int24 tickSpacing,
         address feeManager
     ) external onlyOwner nonReentrant returns (address pool) {
-        (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        pool = IVinuSwapFactory(factory).createPool(token0, token1, fee, tickSpacing, feeManager);
+        _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager);
+    }
 
-        emit PoolCreated(token0, token1, fee, factory, tickSpacing, feeManager, pool);
+    /// @notice Sets the default fee manager for a factory for standard pool creation
+    /// @dev A zero-address resets the default fee manager, disabling deployment
+    /// @param factory The address of the factory for which to set the default fee manager
+    /// @param feeManager The address of the default fee manager
+    function setDefaultFeeManager(address factory, address feeManager) external onlyOwner {
+        defaultFeeManager[factory] = feeManager;
+    }
+
+    /// @notice Sets the default tick spacing for a factory for standard pool creation
+    /// @dev A tick spacing of 0 resets the default tick spacing
+    /// @param factory The address of the factory for which to set the default tick spacing, disabling deployment
+    /// @param fee The fee for which to set the default tick spacing
+    /// @param tickSpacing The default tick spacing
+    function setDefaultTickSpacing(address factory, uint24 fee, int24 tickSpacing) external onlyOwner {
+        require(tickSpacing >= 0 && tickSpacing < 16384, 'Invalid tick spacing');
+        defaultTickSpacing[factory][fee] = tickSpacing;
+    }
+
+    /// @notice Creates a standard pool with the default fee manager and tick spacing
+    /// @dev tokenA and tokenB might be switched, depending on their addresses
+    /// @dev The default fee manager and tick spacing must be set for the factory
+    /// @param factory The address of the factory used to create the pool
+    /// @param tokenA The first token of the pool
+    /// @param tokenB The second token of the pool
+    /// @param fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
+    /// @return pool The address of the created pool
+    function createStandardPool(
+        address factory,
+        address tokenA,
+        address tokenB,
+        uint24 fee
+    ) external nonReentrant returns (address pool) {
+        address feeManager = defaultFeeManager[factory];
+        int24 tickSpacing = defaultTickSpacing[factory][fee];
+        require(feeManager != address(0), 'Fee manager not set');
+        require(tickSpacing > 0, 'Tick spacing not set');
+
+        return _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager);
     }
 
     /// @notice Collects protocol fees from a pool
