@@ -21,7 +21,7 @@ contract OverridableFeeManager is IFeeManager, Ownable {
     }
 
     /// @notice Set the fee manager override for a pool
-    /// @param pool The pool to override the fee manager for
+    /// @param pool The pool to override the fee manager for. A zero address indicates the default fee manager
     function setFeeManagerOverride(address pool, address newFeeManager) external onlyOwner {
         feeManagerOverride[pool] = newFeeManager;
     }
