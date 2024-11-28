@@ -19,6 +19,7 @@ let deployer: any
 
 let controllerBlueprint : hre.ethers.ContractFactory
 let tieredDiscountBlueprint : hre.ethers.ContractFactory
+let overridableFeeManagerBlueprint : hre.ethers.ContractFactory
 let noDiscountBlueprint : hre.ethers.ContractFactory
 let factoryBlueprint : hre.ethers.ContractFactory
 let poolContractBlueprint: ethers.ContractFactory
@@ -218,6 +219,7 @@ describe('test VinuSwapPool', function () {
         controllerBlueprint = await hre.ethers.getContractFactory('Controller')
 
         tieredDiscountBlueprint = await hre.ethers.getContractFactory('TieredDiscount')
+        overridableFeeManagerBlueprint = await hre.ethers.getContractFactory('OverridableFeeManager')
         noDiscountBlueprint = await hre.ethers.getContractFactory('NoDiscount')
 
         factoryBlueprint = await hre.ethers.getContractFactory('VinuSwapFactory')
@@ -1554,6 +1556,235 @@ describe('test VinuSwapPool', function () {
         })
     })
 
+    describe('overridable fee manager', function () {
+        const FEE_TIER_FEE = 100000 // 10%
+        const FEE_TIER_TICK_SPACING = 1
+        beforeEach(async function () {
+            noDiscountContract = await noDiscountBlueprint.deploy()
+            expect(noDiscountContract.address).to.be.a('string')
+            factoryContract = await factoryBlueprint.deploy()
+            expect(factoryContract.address).to.be.a('string')
+        })
+
+        it('deploys a pool with an overridable fee manager', async function () {
+            const [alice] = await newUsers([])
+            const feeManagerContract = await overridableFeeManagerBlueprint.deploy(noDiscountContract.address)
+
+            await factoryContract.setOwner(alice.address)
+
+            const tx = await factoryContract.connect(alice).createPool(TOKEN_0, TOKEN_1, FEE, TICK_SPACING, feeManagerContract.address)
+            const contractAddress = (await tx.wait()).events[0].args.pool
+            expect(contractAddress).to.be.a('string')
+        })
+
+        async function checkPoolForFeeManager(feeManager, postCreationOperation) {
+            const tx = await factoryContract.createPool(TOKEN_0, TOKEN_1, FEE_TIER_FEE, FEE_TIER_TICK_SPACING, feeManager.address)
+            const contractAddress = (await tx.wait()).events[0].args.pool
+
+            poolContract = poolContractBlueprint.attach(contractAddress)
+
+            expect(poolContract.address).to.be.a('string')
+
+            if (postCreationOperation) {
+                await postCreationOperation(poolContract)
+            }
+
+            routerContract = await routerBlueprint.deploy(factoryContract.address, WETH)
+
+            positionDescriptorContract = await positionDescriptorBlueprint.deploy(
+                WETH,
+                hre.ethers.utils.formatBytes32String('VinuSwap Position')
+            )
+
+            positionManagerContract = await positionManagerBlueprint.deploy(
+                factoryContract.address,
+                WETH,
+                positionDescriptorContract.address
+            )
+
+            const [alice] = await newUsers([[TOKEN_0, MONE.toString()], [TOKEN_1, MONE.toString()]])
+            await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+            const mintParams = {
+                token0 : TOKEN_0,
+                token1 : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                tickLower : -887272,
+                tickUpper : 887272,
+                amount0Desired : MONE.mul(1000),
+                amount1Desired : MONE.mul(2000),
+                amount0Min : 0,
+                amount1Min : 0,
+                recipient : deployer.address,
+                deadline : await time.latest() + 1000000
+            }
+
+            await token0Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(1000))
+            await token1Contract.connect(deployer).approve(positionManagerContract.address, MONE.mul(3000))
+            await positionManagerContract.connect(deployer).mint(mintParams)
+
+            await token0Contract.connect(alice).approve(routerContract.address, MONE)
+
+            const swapParams = {
+                tokenIn : TOKEN_0,
+                tokenOut : TOKEN_1,
+                fee : FEE_TIER_FEE,
+                recipient : alice.address,
+                deadline : await time.latest() + 1000000,
+                amountIn : MONE,
+                amountOutMinimum : 0,
+                sqrtPriceLimitX96 : 0
+            }
+
+            await routerContract.connect(alice).exactInputSingle(swapParams)
+
+            // Collect the fees
+
+            const collectParams = {
+                tokenId : 1,
+                recipient : deployer.address,
+                amount0Max : BigNumber.from(2).pow(128).sub(1),
+                amount1Max : BigNumber.from(2).pow(128).sub(1)
+            }
+
+            const initialToken0Balance = await token0Contract.balanceOf(deployer.address)
+            const initialToken1Balance = await token1Contract.balanceOf(deployer.address)
+            await positionManagerContract.connect(deployer).collect(collectParams)
+
+            const finalToken0Balance = await token0Contract.balanceOf(deployer.address)
+            const finalToken1Balance = await token1Contract.balanceOf(deployer.address)
+
+            const token0Amount = finalToken0Balance.sub(initialToken0Balance)
+            const token1Amount = finalToken1Balance.sub(initialToken1Balance)
+
+            return [token0Amount, token1Amount]
+        }
+
+        it('checks that the fee manager respects the default when nothing is set', async function () {
+            const halfDiscountBlueprint = await hre.ethers.getContractFactory('HalfDiscount')
+            const fixedDiscountContract = await halfDiscountBlueprint.deploy()
+            const [alice] = await newUsers([])
+            const feeManagerContract = await overridableFeeManagerBlueprint.deploy(fixedDiscountContract.address)
+            await feeManagerContract.transferOwnership(alice.address)
+
+            const [token0Amount, token1Amount] = await checkPoolForFeeManager(feeManagerContract, null)
+
+            // Discount has been applied
+            expect(token0Amount.toString()).to.be.equal('49999999999999999')
+            expect(token1Amount.toString()).to.be.equal('0')
+        })
+
+        it('checks that the fee manager can be overridden', async function () {
+            const halfDiscountBlueprint = await hre.ethers.getContractFactory('HalfDiscount')
+            const [alice] = await newUsers([])
+            const feeManagerContract = await overridableFeeManagerBlueprint.deploy(noDiscountContract.address)
+            console.log('Deployed fee manager')
+            await feeManagerContract.transferOwnership(alice.address)
+
+            const fixedDiscountContract = await halfDiscountBlueprint.deploy()
+
+            const [token0Amount, token1Amount] = await checkPoolForFeeManager(feeManagerContract, async function (poolContract) {
+                await feeManagerContract.connect(alice).setFeeManagerOverride(poolContract.address, fixedDiscountContract.address)
+            })
+
+            expect(token0Amount.toString()).to.be.equal('49999999999999999')
+            expect(token1Amount.toString()).to.be.equal('0')
+        })
+
+        it('checks that the fee manager uses the default when the override is for another address', async function () {
+            const halfDiscountBlueprint = await hre.ethers.getContractFactory('HalfDiscount')
+            const [alice] = await newUsers([])
+            const feeManagerContract = await overridableFeeManagerBlueprint.deploy(noDiscountContract.address)
+            console.log('Deployed fee manager')
+            await feeManagerContract.transferOwnership(alice.address)
+
+            const fixedDiscountContract = await halfDiscountBlueprint.deploy()
+
+            const [token0Amount, token1Amount] = await checkPoolForFeeManager(feeManagerContract, async function (poolContract) {
+                await feeManagerContract.connect(alice).setFeeManagerOverride(alice.address, fixedDiscountContract.address)
+            })
+
+            // No override
+            expect(token0Amount.toString()).to.be.equal('99999999999999999')
+            expect(token1Amount.toString()).to.be.equal('0')
+        })
+
+        it('checks that the fee manager uses the default when the override is reset', async function () {
+            const halfDiscountBlueprint = await hre.ethers.getContractFactory('HalfDiscount')
+            const [alice] = await newUsers([])
+            const feeManagerContract = await overridableFeeManagerBlueprint.deploy(noDiscountContract.address)
+            console.log('Deployed fee manager')
+            await feeManagerContract.transferOwnership(alice.address)
+
+            const fixedDiscountContract = await halfDiscountBlueprint.deploy()
+
+            const [token0Amount, token1Amount] = await checkPoolForFeeManager(feeManagerContract, async function (poolContract) {
+                await feeManagerContract.connect(alice).setFeeManagerOverride(poolContract.address, fixedDiscountContract.address)
+                await feeManagerContract.connect(alice).setFeeManagerOverride(poolContract.address, ZERO_ADDRESS)
+            })
+
+            // No override
+            expect(token0Amount.toString()).to.be.equal('99999999999999999')
+            expect(token1Amount.toString()).to.be.equal('0')
+        })
+
+        it('checks that updating the default fee manager works', async function () {
+            const halfDiscountBlueprint = await hre.ethers.getContractFactory('HalfDiscount')
+            const [alice] = await newUsers([])
+            const feeManagerContract = await overridableFeeManagerBlueprint.deploy(noDiscountContract.address)
+            console.log('Deployed fee manager')
+            await feeManagerContract.transferOwnership(alice.address)
+
+            const fixedDiscountContract = await halfDiscountBlueprint.deploy()
+
+            const [token0Amount, token1Amount] = await checkPoolForFeeManager(feeManagerContract, async function (poolContract) {
+                await feeManagerContract.connect(alice).setDefaultFeeManager(fixedDiscountContract.address)
+            })
+
+            expect(token0Amount.toString()).to.be.equal('49999999999999999')
+            expect(token1Amount.toString()).to.be.equal('0')
+        })
+
+        it('fails to set the default fee manager without being the owner', async function () {
+            const halfDiscountBlueprint = await hre.ethers.getContractFactory('HalfDiscount')
+            const [alice, bob] = await newUsers([], [])
+            const feeManagerContract = await overridableFeeManagerBlueprint.deploy(noDiscountContract.address)
+            console.log('Deployed fee manager')
+            await feeManagerContract.transferOwnership(alice.address)
+
+            const fixedDiscountContract = await halfDiscountBlueprint.deploy()
+
+            await expect(
+                feeManagerContract.connect(bob).setDefaultFeeManager(fixedDiscountContract.address)
+            ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
+        })
+
+        it('fails to set the fee manager override without being the owner', async function () {
+            const halfDiscountBlueprint = await hre.ethers.getContractFactory('HalfDiscount')
+            const [alice, bob] = await newUsers([], [])
+            const feeManagerContract = await overridableFeeManagerBlueprint.deploy(noDiscountContract.address)
+            console.log('Deployed fee manager')
+            await feeManagerContract.transferOwnership(alice.address)
+
+            const fixedDiscountContract = await halfDiscountBlueprint.deploy()
+
+            await expect(
+                feeManagerContract.connect(bob).setFeeManagerOverride(alice.address, fixedDiscountContract.address)
+            ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
+        })
+
+        it('fails to transfer ownership without being the owner', async function () {
+            const [alice, bob] = await newUsers([], [])
+            const feeManagerContract = await overridableFeeManagerBlueprint.deploy(noDiscountContract.address)
+            console.log('Deployed fee manager')
+            await feeManagerContract.transferOwnership(alice.address)
+
+            await expect(
+                feeManagerContract.connect(bob).transferOwnership(alice.address)
+            ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
+        })
+    })
+
     describe('fee tiers', function () {
         const FEE_TIER_FEE = 100000 // 10%
         const FEE_TIER_TICK_SPACING = 1
@@ -1998,7 +2229,7 @@ describe('test VinuSwapPool', function () {
                 await checkQuery('computeFeeFor', [5000, deployer.address], [0], tieredDiscountContract)
             })
 
-            it.only('correctly changes the discount token', async function () {
+            it('correctly changes the discount token', async function () {
                 const discountTokenContract = await erc20Blueprint.deploy()
                 const newDiscountTokenContract = await erc20Blueprint.deploy()
 
