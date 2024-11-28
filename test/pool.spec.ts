@@ -1232,6 +1232,36 @@ describe('test VinuSwapPool', function () {
                     ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
                 })
 
+                it('transfers a pool\'s ownership', async function () {
+                    await factoryContract.setOwner(controllerContract.address)
+
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    const contractAddress = (await tx.wait()).events[1].args.pool
+
+                    poolContract = poolContractBlueprint.attach(contractAddress)
+                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
+
+                    await controllerContract.connect(dan).transferFactoryOwnership(factoryContract.address, alice.address)
+
+                    expect(await factoryContract.owner()).to.equal(alice.address)
+                })
+
+                it('fails to transfer a pool\'s ownership without being the owner', async function () {
+                    await factoryContract.setOwner(controllerContract.address)
+
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    const contractAddress = (await tx.wait()).events[1].args.pool
+
+                    poolContract = poolContractBlueprint.attach(contractAddress)
+                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
+
+                    const [eric] = await newUsers([])
+
+                    await expect(
+                        controllerContract.connect(eric).transferFactoryOwnership(factoryContract.address, alice.address)
+                    ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
+                })
+
                 describe('standard pool deployment', function () {
                     it('sets the default fee manager', async function () {
                         await factoryContract.setOwner(controllerContract.address)
