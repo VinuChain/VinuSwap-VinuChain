@@ -4,10 +4,11 @@ pragma solidity ^0.7.0;
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '../core/interfaces/IFeeManager.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 /// @title Overridable Fee Manager
 /// @notice Uses a default fee manager, but allows for fee manager overrides on a per-pool basis
-contract OverridableFeeManager is IFeeManager, Ownable {
+contract OverridableFeeManager is IFeeManager, Ownable, ReentrancyGuard {
     address public defaultFeeManager;
     mapping(address => address) public feeManagerOverride;
     constructor(address _defaultFeeManager) Ownable() {
@@ -27,7 +28,7 @@ contract OverridableFeeManager is IFeeManager, Ownable {
     }
 
     /// @inheritdoc IFeeManager
-    function computeFee(uint24 fee) external override returns (uint24) {
+    function computeFee(uint24 fee) external override nonReentrant returns (uint24) {
         if (feeManagerOverride[msg.sender] != address(0)) {
             return IFeeManager(feeManagerOverride[msg.sender]).computeFee(fee);
         }

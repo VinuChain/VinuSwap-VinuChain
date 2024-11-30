@@ -256,7 +256,7 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @param pool The address of the pool for which to set the protocol fee
     /// @param feeProtocol0 The new protocol fee for token0
     /// @param feeProtocol1 The new protocol fee for token1
-    function setFeeProtocol(address pool, uint8 feeProtocol0, uint8 feeProtocol1) external onlyOwner {
+    function setFeeProtocol(address pool, uint8 feeProtocol0, uint8 feeProtocol1) external onlyOwner nonReentrant {
         IUniswapV3PoolOwnerActions(pool).setFeeProtocol(feeProtocol0, feeProtocol1);
         emit SetFeeProtocol(pool, feeProtocol0, feeProtocol1);
     }
@@ -264,7 +264,7 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @notice Initializes a pool
     /// @param pool The address of the pool to initialize
     /// @param sqrtPriceX96 The initial square root price of the pool, in Q64.96
-    function initialize(address pool, uint160 sqrtPriceX96) external onlyOwner {
+    function initialize(address pool, uint160 sqrtPriceX96) external onlyOwner nonReentrant {
         IVinuSwapExtraPoolOwnerActions(pool).initialize(sqrtPriceX96);
         emit Initialize(pool, sqrtPriceX96);
     }
@@ -272,7 +272,7 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @notice Withdraws tokens from the contract
     /// @param token The address of the token to withdraw
     /// @param amount The amount of tokens to withdraw
-    function withdraw(address token, uint256 amount) external {
+    function withdraw(address token, uint256 amount) external nonReentrant {
         require(amount > 0, 'Cannot withdraw 0');
         require(amount <= _balances[msg.sender][token], 'Insufficient balance');
 
