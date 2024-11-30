@@ -288,4 +288,9 @@ contract Controller is Ownable, ReentrancyGuard {
     function balanceOf(address account, address token) public view returns (uint256) {
         return _balances[account][token];
     }
+
+    /// @notice Transfers the ownership of a factory
+    function transferFactoryOwnership(address factory, address newOwner) external nonReentrant onlyOwner {
+        IVinuSwapFactory(factory).setOwner(newOwner);
+    }
 }
