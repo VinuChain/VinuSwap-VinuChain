@@ -179,19 +179,22 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @param tokenA The first token of the pool
     /// @param tokenB The second token of the pool
     /// @param fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
+    /// @param sqrtPriceX96 The initial square root price of the pool, in Q64.96
     /// @return pool The address of the created pool
     function createStandardPool(
         address factory,
         address tokenA,
         address tokenB,
-        uint24 fee
+        uint24 fee,
+        uint160 sqrtPriceX96
     ) external nonReentrant returns (address pool) {
         address feeManager = defaultFeeManager[factory];
         int24 tickSpacing = defaultTickSpacing[factory][fee];
         require(feeManager != address(0), 'Fee manager not set');
         require(tickSpacing > 0, 'Tick spacing not set');
 
-        return _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager);
+        address pool = _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager);
+        IVinuSwapExtraPoolOwnerActions(pool).initialize(sqrtPriceX96);
     }
 
     /// @notice Collects protocol fees from a pool
