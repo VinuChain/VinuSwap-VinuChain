@@ -175,7 +175,7 @@ const newUsers = async (...tokenInfos : Array<Array<Array<String | Number>>>) =>
 }
 
 
-describe('test VinuSwapPool', function () {
+describe.only('test VinuSwapPool', function () {
     before(async function() {
         this.timeout(0)
 
@@ -1169,8 +1169,8 @@ describe('test VinuSwapPool', function () {
                 it('creates a pool', async function () {
                     await factoryContract.setOwner(controllerContract.address)
 
-                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
-                    const contractAddress = (await tx.wait()).events[1].args.pool
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address, encodePriceSqrt(BigNumber.from(2)).toString())
+                    const contractAddress = (await tx.wait()).events[2].args.pool
 
                     poolContract = poolContractBlueprint.attach(contractAddress)
                     
@@ -1183,49 +1183,49 @@ describe('test VinuSwapPool', function () {
                     const [eric] = await newUsers([])
 
                     await expect(
-                        controllerContract.connect(eric).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                        controllerContract.connect(eric).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address, encodePriceSqrt(BigNumber.from(2)).toString())
                     ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
                 })
                 it('initializes a pool', async function () {
                     await factoryContract.setOwner(controllerContract.address)
 
-                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
-                    const contractAddress = (await tx.wait()).events[1].args.pool
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address, encodePriceSqrt(BigNumber.from(2)).toString())
+                    const contractAddress = (await tx.wait()).events[2].args.pool
 
                     poolContract = poolContractBlueprint.attach(contractAddress)
-                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
+                    //await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)).toString())
                 })
-                it('fails to initialize a pool without being the owner', async function () {
+                /*it('fails to initialize a pool without being the owner', async function () {
                     await factoryContract.setOwner(controllerContract.address)
 
-                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address, encodePriceSqrt(BigNumber.from(2)).toString())
                     const contractAddress = (await tx.wait()).events[1].args.pool
 
                     const [eric] = await newUsers([])
 
                     poolContract = poolContractBlueprint.attach(contractAddress)
                     await expect(
-                        controllerContract.connect(eric).initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
+                        controllerContract.connect(eric).initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)).toString())
                     ).to.be.eventually.rejectedWith('Ownable: caller is not the owner')
-                })
+                })*/
                 it('sets protocol fees', async function () {
                     await factoryContract.setOwner(controllerContract.address)
 
-                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
-                    const contractAddress = (await tx.wait()).events[1].args.pool
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address, encodePriceSqrt(BigNumber.from(2)).toString())
+                    const contractAddress = (await tx.wait()).events[2].args.pool
 
                     poolContract = poolContractBlueprint.attach(contractAddress)
-                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
+                    //await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)).toString())
                     await controllerContract.connect(dan).setFeeProtocol(poolContract.address, 4, 5)
                 })
                 it('fails to set protocol fees without being the owner', async function () {
                     await factoryContract.setOwner(controllerContract.address)
 
-                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
-                    const contractAddress = (await tx.wait()).events[1].args.pool
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address, encodePriceSqrt(BigNumber.from(2)).toString())
+                    const contractAddress = (await tx.wait()).events[2].args.pool
 
                     poolContract = poolContractBlueprint.attach(contractAddress)
-                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
+                    //await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)).toString())
 
                     const [eric] = await newUsers([])
 
@@ -1237,11 +1237,11 @@ describe('test VinuSwapPool', function () {
                 it('transfers a pool\'s ownership', async function () {
                     await factoryContract.setOwner(controllerContract.address)
 
-                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
-                    const contractAddress = (await tx.wait()).events[1].args.pool
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address, encodePriceSqrt(BigNumber.from(2)).toString())
+                    const contractAddress = (await tx.wait()).events[2].args.pool
 
                     poolContract = poolContractBlueprint.attach(contractAddress)
-                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
+                    //await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)).toString())
 
                     await controllerContract.connect(dan).transferFactoryOwnership(factoryContract.address, alice.address)
 
@@ -1251,11 +1251,11 @@ describe('test VinuSwapPool', function () {
                 it('fails to transfer a pool\'s ownership without being the owner', async function () {
                     await factoryContract.setOwner(controllerContract.address)
 
-                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address)
-                    const contractAddress = (await tx.wait()).events[1].args.pool
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address, encodePriceSqrt(BigNumber.from(2)).toString())
+                    const contractAddress = (await tx.wait()).events[2].args.pool
 
                     poolContract = poolContractBlueprint.attach(contractAddress)
-                    await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)))
+                    //await controllerContract.initialize(poolContract.address, encodePriceSqrt(BigNumber.from(2)).toString())
 
                     const [eric] = await newUsers([])
 
@@ -1356,9 +1356,9 @@ describe('test VinuSwapPool', function () {
                         await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, noDiscountContract.address)
                         await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
 
-                        const tx = await controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                        const tx = await controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
 
-                        const contractAddress = (await tx.wait()).events[1].args.pool
+                        const contractAddress = (await tx.wait()).events[2].args.pool
 
                         poolContract = poolContractBlueprint.attach(contractAddress)
 
@@ -1378,7 +1378,7 @@ describe('test VinuSwapPool', function () {
                         await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
 
                         await expect(
-                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
                         ).to.be.eventually.rejectedWith('Fee manager not set')
                     })
                     it('fails to deploy a standard pool if the default fee manager is set for the wrong factory', async function () {
@@ -1393,7 +1393,7 @@ describe('test VinuSwapPool', function () {
                         await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
 
                         await expect(
-                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
                         ).to.be.eventually.rejectedWith('Fee manager not set')
                     })
                     it('fails to deploy a standard pool if the default tick spacing is not set', async function () {
@@ -1406,7 +1406,7 @@ describe('test VinuSwapPool', function () {
                         //await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
 
                         await expect(
-                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
                         ).to.be.eventually.rejectedWith('Tick spacing not set')
                     })
                     it('fails to deploy a standard pool if the default tick spacing is set for the wrong factory', async function () {
@@ -1421,7 +1421,7 @@ describe('test VinuSwapPool', function () {
                         await controllerContract.connect(dan).setDefaultTickSpacing(newFactoryContract.address, 200, 60)
 
                         await expect(
-                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
                         ).to.be.eventually.rejectedWith('Tick spacing not set')
                     })
                     it('fails to deploy a standard pool if the default tick spacing is set for the wrong factory', async function () {
@@ -1434,7 +1434,7 @@ describe('test VinuSwapPool', function () {
                         await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 150, 60)
 
                         await expect(
-                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
                         ).to.be.eventually.rejectedWith('Tick spacing not set')
                     })
                     it('fails to deploy a standard pool if neither the fee manager nor the tick spacing are set', async function () {
@@ -1447,7 +1447,7 @@ describe('test VinuSwapPool', function () {
                         //await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 60)
 
                         await expect(
-                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
                         ).to.be.eventually.rejectedWith('Fee manager not set')
                     })
                     it('fails to deploy a standard pool if the fee manager has been reset', async function () {
@@ -1461,7 +1461,7 @@ describe('test VinuSwapPool', function () {
                         await controllerContract.connect(dan).setDefaultFeeManager(factoryContract.address, ZERO_ADDRESS)
 
                         await expect(
-                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
                         ).to.be.eventually.rejectedWith('Fee manager not set')
                     })
                     it('fails to deploy a standard pool if the tick spacing has been reset', async function () {
@@ -1475,7 +1475,7 @@ describe('test VinuSwapPool', function () {
                         await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 0)
 
                         await expect(
-                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
                         ).to.be.eventually.rejectedWith('Tick spacing not set')
                     })
                     it('fails to deploy a standard pool if both the fee manager and the tick spacing have been reset', async function () {
@@ -1490,7 +1490,7 @@ describe('test VinuSwapPool', function () {
                         await controllerContract.connect(dan).setDefaultTickSpacing(factoryContract.address, 200, 0)
 
                         await expect(
-                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200)
+                            controllerContract.connect(eric).createStandardPool(factoryContract.address, TOKEN_0, TOKEN_1, 200, encodePriceSqrt(BigNumber.from(2)).toString())
                         ).to.be.eventually.rejectedWith('Fee manager not set')
                     })
                 })

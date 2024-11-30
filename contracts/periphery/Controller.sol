@@ -46,6 +46,7 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @param factory The factory used to deploy the pool
     /// @param tickSpacing The minimum number of ticks between initialized ticks
     /// @param feeManager The address of the fee manager
+    /// @param sqrtPriceX96 The initial square root price of the pool, in Q64.96
     /// @param pool The address of the created pool
     event PoolCreated(
         address indexed token0,
@@ -54,6 +55,7 @@ contract Controller is Ownable, ReentrancyGuard {
         address factory,
         int24 tickSpacing,
         address feeManager,
+        uint160 sqrtPriceX96,
         address pool
     );
 
@@ -119,6 +121,7 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @param fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
     /// @param tickSpacing The minimum number of ticks between valid price ticks
     /// @param feeManager The address of the fee manager
+    /// @param sqrtPriceX96 The initial square root price of the pool, in Q64.96
     /// @return pool The address of the created pool
     function _createPoolInternal(
         address factory,
@@ -126,12 +129,14 @@ contract Controller is Ownable, ReentrancyGuard {
         address tokenB,
         uint24 fee,
         int24 tickSpacing,
-        address feeManager
+        address feeManager,
+        uint160 sqrtPriceX96
     ) internal returns (address pool) {
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         pool = IVinuSwapFactory(factory).createPool(token0, token1, fee, tickSpacing, feeManager);
+        IVinuSwapExtraPoolOwnerActions(pool).initialize(sqrtPriceX96);
 
-        emit PoolCreated(token0, token1, fee, factory, tickSpacing, feeManager, pool);
+        emit PoolCreated(token0, token1, fee, factory, tickSpacing, feeManager, sqrtPriceX96, pool);
     }
 
     /// @notice Creates a new pool
@@ -142,6 +147,7 @@ contract Controller is Ownable, ReentrancyGuard {
     /// @param fee The fee collected upon every swap in the pool, denominated in hundredths of a bip
     /// @param tickSpacing The minimum number of ticks between valid price ticks
     /// @param feeManager The address of the fee manager
+    /// @param sqrtPriceX96 The initial square root price of the pool, in Q64.96
     /// @return pool The address of the created pool
     function createPool(
         address factory,
@@ -149,9 +155,10 @@ contract Controller is Ownable, ReentrancyGuard {
         address tokenB,
         uint24 fee,
         int24 tickSpacing,
-        address feeManager
+        address feeManager,
+        uint160 sqrtPriceX96
     ) external onlyOwner nonReentrant returns (address pool) {
-        _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager);
+        _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager, sqrtPriceX96);
     }
 
     /// @notice Sets the default fee manager for a factory for standard pool creation
@@ -193,8 +200,7 @@ contract Controller is Ownable, ReentrancyGuard {
         require(feeManager != address(0), 'Fee manager not set');
         require(tickSpacing > 0, 'Tick spacing not set');
 
-        address pool = _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager);
-        IVinuSwapExtraPoolOwnerActions(pool).initialize(sqrtPriceX96);
+        return _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager, sqrtPriceX96);
     }
 
     /// @notice Collects protocol fees from a pool
