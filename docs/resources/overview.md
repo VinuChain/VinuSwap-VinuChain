@@ -76,13 +76,13 @@ VinuSwap is based on Uniswap V3. These resources provide additional context:
 
 ### VinuChain
 
-| Token | Symbol | Address |
-|-------|--------|---------|
-| Wrapped VINU | WVINU | `0x...` |
-| USD Coin | USDC | `0x...` |
-| Tether | USDT | `0x...` |
-
-*Note: Update addresses after deployment*
+| Token | Symbol | Decimals | Address |
+|-------|--------|----------|---------|
+| Wrapped VC | WVC | 18 | `0xEd8c5530a0A086a12f57275728128a60DFf04230` |
+| USDT@VinuChain | USDT | 6 | `0xC0264277fcCa5FCfabd41a8bC01c1FcAF8383E41` |
+| ETH@VinuChain | ETH | 18 | `0xDd4b9b3Ce03faAbA4a3839c8B5023b7792be6e2C` |
+| BTC@VinuChain | BTC | 8 | `0x69120197b77b51d32fFA5eAfe16b3D78115640c6` |
+| Vita Inu | VINU | 18 | `0x00c1E515EA9579856304198EFb15f525A0bb50f6` |
 
 ## Support Channels
 

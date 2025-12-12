@@ -12,8 +12,8 @@ VinuSwap uses **concentrated liquidity**, where LPs provide liquidity within spe
 const { ethers } = require('ethers');
 
 const POSITION_MANAGER = '0xF699ec0764741f66F81068665eFFAeefA3c6037a';
-const WETH = '0x...';  // WETH address on VinuChain
-const USDC = '0x...';  // USDC address on VinuChain
+const WVC = '0xEd8c5530a0A086a12f57275728128a60DFf04230';   // Wrapped VC (native token)
+const USDT = '0xC0264277fcCa5FCfabd41a8bC01c1FcAF8383E41';  // USDT on VinuChain
 
 const positionManager = new ethers.Contract(
     POSITION_MANAGER,

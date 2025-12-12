@@ -102,9 +102,9 @@ const ADDRESSES = {
     quoter: '0xEed635Fa2343355d9bA726C379F2B5dEa70fE65C',
     router: '0x48f450475a8b501A7480C1Fd02935a7327F713Ad',
     positionManager: '0xF699ec0764741f66F81068665eFFAeefA3c6037a',
-    pool: '0x...',      // Pool address (depends on token pair)
-    token0: '0x...',    // First token address
-    token1: '0x...'     // Second token address
+    wvc: '0xEd8c5530a0A086a12f57275728128a60DFf04230',      // Wrapped VC (native token)
+    usdt: '0xC0264277fcCa5FCfabd41a8bC01c1FcAF8383E41',     // USDT on VinuChain
+    pool: '0x...'       // Pool address (depends on token pair)
 };
 
 async function main() {
