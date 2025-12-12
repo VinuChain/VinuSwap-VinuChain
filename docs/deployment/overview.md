@@ -159,7 +159,7 @@ After deployment, document addresses:
 ```json
 {
   "network": "vinu",
-  "chainId": 206,
+  "chainId": 207,
   "contracts": {
     "WVC": "0x...",
     "TieredDiscount": "0x...",

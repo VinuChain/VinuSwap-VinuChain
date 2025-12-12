@@ -13,7 +13,7 @@ networks: {
     vinu: {
         url: process.env.VINU_RPC_URL || 'https://rpc.vinuchain.org',
         accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-        chainId: 206
+        chainId: 207
     }
 }
 ```
@@ -355,7 +355,7 @@ async function main() {
         'deployments/vinu.json',
         JSON.stringify({
             network: 'vinu',
-            chainId: 206,
+            chainId: 207,
             deployer: deployer.address,
             timestamp: new Date().toISOString(),
             contracts: deployed
