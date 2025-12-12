@@ -30,33 +30,38 @@ Protocol fees can be distributed to multiple accounts with configurable shares t
 
 ## Architecture Overview
 
-```mermaid
-flowchart TB
-    subgraph UI["User Interface"]
-        dApp["dApp / Frontend"]
-    end
-
-    subgraph Periphery["Periphery Contracts"]
-        Router["SwapRouter"]
-        PM["NonfungiblePositionManager"]
-        Quoter["VinuSwapQuoter"]
-    end
-
-    subgraph Core["Core Contracts"]
-        Factory["VinuSwapFactory"]
-        Pool["VinuSwapPool<br/>• Concentrated Liquidity<br/>• Fee Accumulation<br/>• TWAP Oracle"]
-    end
-
-    subgraph Fees["Fee Management Layer"]
-        Tiered["TieredDiscount"]
-        Override["OverridableFeeManager"]
-        Controller["Controller"]
-    end
-
-    UI --> Periphery
-    Periphery --> Core
-    Factory -->|creates| Pool
-    Core --> Fees
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        User Interface                           │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Periphery Contracts                          │
+│  ┌─────────────┐  ┌──────────────────────┐  ┌───────────────┐  │
+│  │ SwapRouter  │  │ NonfungiblePosition  │  │ VinuSwapQuoter│  │
+│  │             │  │      Manager         │  │               │  │
+│  └─────────────┘  └──────────────────────┘  └───────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Core Contracts                             │
+│  ┌─────────────────┐              ┌──────────────────────────┐  │
+│  │ VinuSwapFactory │───creates───▶│     VinuSwapPool         │  │
+│  └─────────────────┘              │  - Concentrated Liquidity │  │
+│                                   │  - Fee Accumulation       │  │
+│                                   │  - TWAP Oracle            │  │
+│                                   └──────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Fee Management Layer                         │
+│  ┌──────────────┐  ┌────────────────────┐  ┌────────────────┐  │
+│  │ TieredDiscount│  │OverridableFeeManager│  │  Controller   │  │
+│  └──────────────┘  └────────────────────┘  └────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Getting Started
