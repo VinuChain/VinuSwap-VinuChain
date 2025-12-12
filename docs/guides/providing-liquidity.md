@@ -1,0 +1,496 @@
+# Providing Liquidity
+
+This guide covers creating and managing liquidity positions on VinuSwap.
+
+## Overview
+
+VinuSwap uses **concentrated liquidity**, where LPs provide liquidity within specific price ranges represented as NFTs.
+
+## Prerequisites
+
+```javascript
+const { ethers } = require('ethers');
+
+const POSITION_MANAGER = '0x...';
+const WETH = '0x...';
+const USDC = '0x...';
+
+const positionManager = new ethers.Contract(
+    POSITION_MANAGER,
+    positionManagerABI,
+    signer
+);
+```
+
+## Creating Positions
+
+### Choose Your Price Range
+
+Convert prices to ticks:
+
+```javascript
+function priceToTick(price) {
+    return Math.floor(Math.log(price) / Math.log(1.0001));
+}
+
+function tickToPrice(tick) {
+    return Math.pow(1.0001, tick);
+}
+
+// Round tick to valid tick spacing
+function nearestUsableTick(tick, tickSpacing) {
+    return Math.round(tick / tickSpacing) * tickSpacing;
+}
+
+// Example: WETH/USDC position from $1,800 to $2,200
+const tickSpacing = 60;  // 0.3% fee tier
+const tickLower = nearestUsableTick(priceToTick(1800), tickSpacing);
+const tickUpper = nearestUsableTick(priceToTick(2200), tickSpacing);
+```
+
+### Mint Position
+
+```javascript
+async function createPosition(
+    token0,
+    token1,
+    fee,
+    tickLower,
+    tickUpper,
+    amount0Desired,
+    amount1Desired,
+    slippagePercent = 0.5
+) {
+    // Ensure tokens are sorted
+    if (token0.toLowerCase() > token1.toLowerCase()) {
+        [token0, token1] = [token1, token0];
+        [amount0Desired, amount1Desired] = [amount1Desired, amount0Desired];
+    }
+
+    // Calculate minimum amounts with slippage
+    const slippageBps = slippagePercent * 100;
+    const amount0Min = amount0Desired.mul(10000 - slippageBps).div(10000);
+    const amount1Min = amount1Desired.mul(10000 - slippageBps).div(10000);
+
+    // Approve tokens
+    const token0Contract = new ethers.Contract(token0, erc20ABI, signer);
+    const token1Contract = new ethers.Contract(token1, erc20ABI, signer);
+    await token0Contract.approve(positionManager.address, amount0Desired);
+    await token1Contract.approve(positionManager.address, amount1Desired);
+
+    // Mint params
+    const params = {
+        token0,
+        token1,
+        fee,
+        tickLower,
+        tickUpper,
+        amount0Desired,
+        amount1Desired,
+        amount0Min,
+        amount1Min,
+        recipient: signer.address,
+        deadline: Math.floor(Date.now() / 1000) + 1800
+    };
+
+    const tx = await positionManager.mint(params);
+    const receipt = await tx.wait();
+
+    // Parse events to get token ID
+    const event = receipt.events.find(e => e.event === 'IncreaseLiquidity');
+    const tokenId = event.args.tokenId;
+
+    return { receipt, tokenId };
+}
+
+// Usage
+const { tokenId } = await createPosition(
+    USDC,
+    WETH,
+    3000,  // 0.3% fee
+    tickLower,
+    tickUpper,
+    ethers.utils.parseUnits('2000', 6),  // 2000 USDC
+    ethers.utils.parseEther('1')          // 1 WETH
+);
+```
+
+### Create Position with ETH
+
+```javascript
+async function createPositionWithETH(
+    token,
+    fee,
+    tickLower,
+    tickUpper,
+    tokenAmount,
+    ethAmount
+) {
+    // WETH is always either token0 or token1
+    const isWETHToken0 = WETH.toLowerCase() < token.toLowerCase();
+
+    const params = {
+        token0: isWETHToken0 ? WETH : token,
+        token1: isWETHToken0 ? token : WETH,
+        fee,
+        tickLower,
+        tickUpper,
+        amount0Desired: isWETHToken0 ? ethAmount : tokenAmount,
+        amount1Desired: isWETHToken0 ? tokenAmount : ethAmount,
+        amount0Min: 0,
+        amount1Min: 0,
+        recipient: signer.address,
+        deadline: Math.floor(Date.now() / 1000) + 1800
+    };
+
+    // Approve token
+    const tokenContract = new ethers.Contract(token, erc20ABI, signer);
+    await tokenContract.approve(positionManager.address, tokenAmount);
+
+    // Mint with ETH value
+    const tx = await positionManager.mint(params, { value: ethAmount });
+    return await tx.wait();
+}
+```
+
+## Managing Positions
+
+### View Position Details
+
+```javascript
+async function getPosition(tokenId) {
+    const position = await positionManager.positions(tokenId);
+
+    return {
+        nonce: position.nonce,
+        operator: position.operator,
+        token0: position.token0,
+        token1: position.token1,
+        fee: position.fee,
+        tickLower: position.tickLower,
+        tickUpper: position.tickUpper,
+        liquidity: position.liquidity,
+        feeGrowthInside0LastX128: position.feeGrowthInside0LastX128,
+        feeGrowthInside1LastX128: position.feeGrowthInside1LastX128,
+        tokensOwed0: position.tokensOwed0,
+        tokensOwed1: position.tokensOwed1
+    };
+}
+```
+
+### Increase Liquidity
+
+```javascript
+async function increaseLiquidity(tokenId, amount0, amount1) {
+    const params = {
+        tokenId,
+        amount0Desired: amount0,
+        amount1Desired: amount1,
+        amount0Min: 0,
+        amount1Min: 0,
+        deadline: Math.floor(Date.now() / 1000) + 1800
+    };
+
+    // Approve additional tokens
+    const position = await positionManager.positions(tokenId);
+    await approveToken(position.token0, amount0);
+    await approveToken(position.token1, amount1);
+
+    const tx = await positionManager.increaseLiquidity(params);
+    return await tx.wait();
+}
+```
+
+### Decrease Liquidity
+
+```javascript
+async function decreaseLiquidity(tokenId, liquidityAmount) {
+    const params = {
+        tokenId,
+        liquidity: liquidityAmount,
+        amount0Min: 0,  // Add slippage protection
+        amount1Min: 0,
+        deadline: Math.floor(Date.now() / 1000) + 1800
+    };
+
+    const tx = await positionManager.decreaseLiquidity(params);
+    return await tx.wait();
+
+    // Note: Tokens are not transferred yet - call collect()
+}
+
+// Remove all liquidity
+async function removeAllLiquidity(tokenId) {
+    const position = await positionManager.positions(tokenId);
+    return decreaseLiquidity(tokenId, position.liquidity);
+}
+```
+
+## Collecting Fees
+
+### Collect Accumulated Fees
+
+```javascript
+async function collectFees(tokenId, recipient) {
+    const params = {
+        tokenId,
+        recipient: recipient || signer.address,
+        amount0Max: ethers.constants.MaxUint128,
+        amount1Max: ethers.constants.MaxUint128
+    };
+
+    const tx = await positionManager.collect(params);
+    const receipt = await tx.wait();
+
+    // Parse collected amounts from event
+    const event = receipt.events.find(e => e.event === 'Collect');
+
+    return {
+        amount0: event.args.amount0,
+        amount1: event.args.amount1
+    };
+}
+```
+
+### Collect to ETH
+
+If your position includes WETH and you want ETH:
+
+```javascript
+async function collectToETH(tokenId) {
+    const position = await positionManager.positions(tokenId);
+    const hasWETH = position.token0 === WETH || position.token1 === WETH;
+
+    if (!hasWETH) {
+        throw new Error('Position does not include WETH');
+    }
+
+    // Collect to router (ADDRESS_ZERO triggers unwrap handling)
+    const collectParams = {
+        tokenId,
+        recipient: ethers.constants.AddressZero,
+        amount0Max: ethers.constants.MaxUint128,
+        amount1Max: ethers.constants.MaxUint128
+    };
+
+    const calls = [
+        positionManager.interface.encodeFunctionData('collect', [collectParams]),
+        positionManager.interface.encodeFunctionData('unwrapWETH9', [0, signer.address]),
+        positionManager.interface.encodeFunctionData('sweepToken', [
+            position.token0 === WETH ? position.token1 : position.token0,
+            0,
+            signer.address
+        ])
+    ];
+
+    const tx = await positionManager.multicall(calls);
+    return await tx.wait();
+}
+```
+
+## Closing Positions
+
+### Full Withdrawal and Burn
+
+```javascript
+async function closePosition(tokenId) {
+    const position = await positionManager.positions(tokenId);
+
+    // 1. Decrease all liquidity
+    if (position.liquidity.gt(0)) {
+        await positionManager.decreaseLiquidity({
+            tokenId,
+            liquidity: position.liquidity,
+            amount0Min: 0,
+            amount1Min: 0,
+            deadline: Math.floor(Date.now() / 1000) + 1800
+        });
+    }
+
+    // 2. Collect all tokens
+    await positionManager.collect({
+        tokenId,
+        recipient: signer.address,
+        amount0Max: ethers.constants.MaxUint128,
+        amount1Max: ethers.constants.MaxUint128
+    });
+
+    // 3. Burn the NFT
+    await positionManager.burn(tokenId);
+}
+```
+
+### Using Multicall
+
+```javascript
+async function closePositionMulticall(tokenId) {
+    const position = await positionManager.positions(tokenId);
+    const deadline = Math.floor(Date.now() / 1000) + 1800;
+
+    const calls = [];
+
+    // Decrease liquidity
+    if (position.liquidity.gt(0)) {
+        calls.push(
+            positionManager.interface.encodeFunctionData('decreaseLiquidity', [{
+                tokenId,
+                liquidity: position.liquidity,
+                amount0Min: 0,
+                amount1Min: 0,
+                deadline
+            }])
+        );
+    }
+
+    // Collect
+    calls.push(
+        positionManager.interface.encodeFunctionData('collect', [{
+            tokenId,
+            recipient: signer.address,
+            amount0Max: ethers.constants.MaxUint128,
+            amount1Max: ethers.constants.MaxUint128
+        }])
+    );
+
+    // Burn
+    calls.push(
+        positionManager.interface.encodeFunctionData('burn', [tokenId])
+    );
+
+    const tx = await positionManager.multicall(calls);
+    return await tx.wait();
+}
+```
+
+## Position Value Calculation
+
+### Calculate Token Amounts
+
+```javascript
+const { TickMath, Position, Pool } = require('@uniswap/v3-sdk');
+
+function getPositionAmounts(
+    liquidity,
+    sqrtPriceX96,
+    tickLower,
+    tickUpper
+) {
+    const sqrtRatioA = TickMath.getSqrtRatioAtTick(tickLower);
+    const sqrtRatioB = TickMath.getSqrtRatioAtTick(tickUpper);
+
+    let amount0, amount1;
+
+    if (sqrtPriceX96 <= sqrtRatioA) {
+        // Current price below range
+        amount0 = Position.getAmount0(sqrtRatioA, sqrtRatioB, liquidity);
+        amount1 = BigNumber.from(0);
+    } else if (sqrtPriceX96 >= sqrtRatioB) {
+        // Current price above range
+        amount0 = BigNumber.from(0);
+        amount1 = Position.getAmount1(sqrtRatioA, sqrtRatioB, liquidity);
+    } else {
+        // Current price in range
+        amount0 = Position.getAmount0(sqrtPriceX96, sqrtRatioB, liquidity);
+        amount1 = Position.getAmount1(sqrtRatioA, sqrtPriceX96, liquidity);
+    }
+
+    return { amount0, amount1 };
+}
+```
+
+### Calculate Uncollected Fees
+
+```javascript
+async function getUnclaimedFees(pool, position, tokenId) {
+    const poolContract = new ethers.Contract(pool, poolABI, provider);
+
+    // Get global fee growth
+    const feeGrowthGlobal0 = await poolContract.feeGrowthGlobal0X128();
+    const feeGrowthGlobal1 = await poolContract.feeGrowthGlobal1X128();
+
+    // Get position fee snapshots
+    const positionData = await positionManager.positions(tokenId);
+
+    // Calculate fees (simplified - full calculation needs tick data)
+    const feeGrowthInside0 = feeGrowthGlobal0.sub(positionData.feeGrowthInside0LastX128);
+    const feeGrowthInside1 = feeGrowthGlobal1.sub(positionData.feeGrowthInside1LastX128);
+
+    const fees0 = feeGrowthInside0.mul(positionData.liquidity).div(ethers.BigNumber.from(2).pow(128));
+    const fees1 = feeGrowthInside1.mul(positionData.liquidity).div(ethers.BigNumber.from(2).pow(128));
+
+    return {
+        fees0: fees0.add(positionData.tokensOwed0),
+        fees1: fees1.add(positionData.tokensOwed1)
+    };
+}
+```
+
+## Range Strategies
+
+### Full Range Position
+
+```javascript
+const MIN_TICK = -887272;
+const MAX_TICK = 887272;
+
+async function createFullRangePosition(token0, token1, fee, amount0, amount1) {
+    const tickSpacing = getTickSpacing(fee);
+    const tickLower = Math.ceil(MIN_TICK / tickSpacing) * tickSpacing;
+    const tickUpper = Math.floor(MAX_TICK / tickSpacing) * tickSpacing;
+
+    return createPosition(token0, token1, fee, tickLower, tickUpper, amount0, amount1);
+}
+```
+
+### Narrow Range Position
+
+```javascript
+async function createNarrowPosition(
+    token0,
+    token1,
+    fee,
+    currentPrice,
+    rangePercent,  // e.g., 5 for ±5%
+    amount0,
+    amount1
+) {
+    const tickSpacing = getTickSpacing(fee);
+    const currentTick = priceToTick(currentPrice);
+
+    const ticksFromCurrent = Math.ceil(
+        Math.log(1 + rangePercent / 100) / Math.log(1.0001)
+    );
+
+    const tickLower = nearestUsableTick(currentTick - ticksFromCurrent, tickSpacing);
+    const tickUpper = nearestUsableTick(currentTick + ticksFromCurrent, tickSpacing);
+
+    return createPosition(token0, token1, fee, tickLower, tickUpper, amount0, amount1);
+}
+```
+
+## Error Handling
+
+```javascript
+async function safeCreatePosition(params) {
+    try {
+        return await createPosition(...params);
+    } catch (error) {
+        if (error.message.includes('Price slippage check')) {
+            throw new Error('Price moved, increase slippage tolerance');
+        }
+        if (error.message.includes('TLU')) {
+            throw new Error('tickLower must be less than tickUpper');
+        }
+        if (error.message.includes('TLM') || error.message.includes('TUM')) {
+            throw new Error('Tick out of valid range');
+        }
+        throw error;
+    }
+}
+```
+
+## Next Steps
+
+- [Position Locking](position-locking.md)
+- [Fee Discounts](fee-discounts.md)
+- [NonfungiblePositionManager Reference](../reference/periphery/position-manager.md)

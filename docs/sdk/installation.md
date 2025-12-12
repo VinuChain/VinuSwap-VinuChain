@@ -1,0 +1,168 @@
+# Installation
+
+## Using the SDK
+
+The SDK is included in the VinuSwap repository and can be imported directly.
+
+### Direct Import
+
+```typescript
+// Import from local SDK
+import { VinuSwap } from './sdk/core';
+import { encodePrice, decodePrice } from './sdk/utils';
+```
+
+### As a Package (Future)
+
+When published as an npm package:
+
+```bash
+npm install @vinuswap/sdk
+```
+
+```typescript
+import { VinuSwap } from '@vinuswap/sdk';
+```
+
+## Dependencies
+
+Ensure these dependencies are installed:
+
+```bash
+npm install ethers@^5.7.0
+npm install @uniswap/v3-sdk @uniswap/sdk-core
+```
+
+## TypeScript Configuration
+
+The SDK requires TypeScript with ES2020 target:
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "strict": false,
+    "esModuleInterop": true,
+    "resolveJsonModule": true
+  }
+}
+```
+
+## Contract ABIs
+
+The SDK needs contract ABIs. These are generated during compilation:
+
+```bash
+npx hardhat compile
+```
+
+ABIs are located in:
+- `artifacts/contracts/core/VinuSwapPool.sol/VinuSwapPool.json`
+- `artifacts/contracts/periphery/SwapRouter.sol/SwapRouter.json`
+- `artifacts/contracts/periphery/NonfungiblePositionManager.sol/NonfungiblePositionManager.json`
+- `artifacts/contracts/periphery/VinuSwapQuoter.sol/VinuSwapQuoter.json`
+
+## Provider Setup
+
+### Local Development
+
+```typescript
+const provider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
+```
+
+### VinuChain Mainnet
+
+```typescript
+const provider = new ethers.providers.JsonRpcProvider(
+    'https://rpc.vinuchain.org'
+);
+```
+
+### With Signer
+
+```typescript
+// From private key
+const signer = new ethers.Wallet(PRIVATE_KEY, provider);
+
+// From browser wallet
+const signer = provider.getSigner();
+```
+
+## Initialization Example
+
+```typescript
+import { ethers } from 'ethers';
+import { VinuSwap } from './sdk/core';
+
+// Contract addresses (from deployment)
+const ADDRESSES = {
+    pool: '0x...',
+    quoter: '0x...',
+    router: '0x...',
+    positionManager: '0x...',
+    token0: '0x...',
+    token1: '0x...'
+};
+
+async function main() {
+    // Setup provider
+    const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+    const signer = new ethers.Wallet(PRIVATE_KEY, provider);
+
+    // Create SDK instance
+    const sdk = await VinuSwap.create(
+        ADDRESSES.token0,
+        ADDRESSES.token1,
+        ADDRESSES.pool,
+        ADDRESSES.quoter,
+        ADDRESSES.router,
+        ADDRESSES.positionManager,
+        provider
+    );
+
+    // Connect signer
+    const connected = sdk.connect(signer);
+
+    // Ready to use
+    console.log('SDK initialized');
+}
+
+main();
+```
+
+## Verification
+
+Test your setup:
+
+```typescript
+async function verifySetup(sdk: VinuSwap) {
+    // Check pool
+    const slot0 = await sdk.pool.slot0();
+    console.log('Current tick:', slot0.tick);
+
+    // Check quoter
+    const quote = await sdk.quoter.callStatic.quoteExactInputSingle(
+        sdk.token0,
+        sdk.token1,
+        3000,
+        ethers.utils.parseEther('1'),
+        0
+    );
+    console.log('Quote works:', quote[0].toString());
+
+    // Check signer (if connected)
+    if (sdk.signer) {
+        const address = await sdk.signer.getAddress();
+        console.log('Signer address:', address);
+    }
+
+    console.log('Setup verified!');
+}
+```
+
+## Next Steps
+
+- [VinuSwap Class](vinuswap-class.md)
+- [Utilities](utilities.md)
