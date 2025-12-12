@@ -18,11 +18,11 @@ VinuSwap supports four swap types:
 ```javascript
 const { ethers } = require('ethers');
 
-// Contract addresses (replace with actual)
-const SWAP_ROUTER = '0x...';
-const QUOTER = '0x...';
-const WETH = '0x...';
-const USDC = '0x...';
+// Contract addresses
+const SWAP_ROUTER = '0x48f450475a8b501A7480C1Fd02935a7327F713Ad';
+const QUOTER = '0xEed635Fa2343355d9bA726C379F2B5dEa70fE65C';
+const WETH = '0x...';  // WETH address on VinuChain
+const USDC = '0x...';  // USDC address on VinuChain
 
 // ABIs
 const routerABI = require('./abi/SwapRouter.json');

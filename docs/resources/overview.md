@@ -56,25 +56,21 @@ VinuSwap is based on Uniswap V3. These resources provide additional context:
 
 | Contract | Address |
 |----------|---------|
-| Factory | `0x...` |
-| SwapRouter | `0x...` |
-| NonfungiblePositionManager | `0x...` |
-| VinuSwapQuoter | `0x...` |
-| TieredDiscount | `0x...` |
-| Controller | `0x...` |
-
-*Note: Update addresses after deployment*
+| VinuSwapFactory | `0xd74dEe1C78D5C58FbdDe619b707fcFbAE50c3EEe` |
+| SwapRouter | `0x48f450475a8b501A7480C1Fd02935a7327F713Ad` |
+| NonfungiblePositionManager | `0xF699ec0764741f66F81068665eFFAeefA3c6037a` |
+| VinuSwapQuoter | `0xEed635Fa2343355d9bA726C379F2B5dEa70fE65C` |
+| NonfungibleTokenPositionDescriptor | `0xCA04dFDEE5778f6c23a7BdBa46A8D95F5094e4B5` |
+| Controller | `0x47fF80713b1d66DdA47237AB374F3080E2075528` |
 
 ### VinuChain Testnet
 
 | Contract | Address |
 |----------|---------|
-| Factory | `0x...` |
-| SwapRouter | `0x...` |
-| NonfungiblePositionManager | `0x...` |
-| VinuSwapQuoter | `0x...` |
-
-*Note: Update addresses after deployment*
+| Factory | *Not yet deployed* |
+| SwapRouter | *Not yet deployed* |
+| NonfungiblePositionManager | *Not yet deployed* |
+| VinuSwapQuoter | *Not yet deployed* |
 
 ## Common Token Addresses
 

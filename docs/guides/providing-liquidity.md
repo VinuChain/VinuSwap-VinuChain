@@ -11,9 +11,9 @@ VinuSwap uses **concentrated liquidity**, where LPs provide liquidity within spe
 ```javascript
 const { ethers } = require('ethers');
 
-const POSITION_MANAGER = '0x...';
-const WETH = '0x...';
-const USDC = '0x...';
+const POSITION_MANAGER = '0xF699ec0764741f66F81068665eFFAeefA3c6037a';
+const WETH = '0x...';  // WETH address on VinuChain
+const USDC = '0x...';  // USDC address on VinuChain
 
 const positionManager = new ethers.Contract(
     POSITION_MANAGER,

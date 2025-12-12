@@ -98,12 +98,13 @@ import { VinuSwap } from './sdk/core';
 
 // Contract addresses (from deployment)
 const ADDRESSES = {
-    pool: '0x...',
-    quoter: '0x...',
-    router: '0x...',
-    positionManager: '0x...',
-    token0: '0x...',
-    token1: '0x...'
+    factory: '0xd74dEe1C78D5C58FbdDe619b707fcFbAE50c3EEe',
+    quoter: '0xEed635Fa2343355d9bA726C379F2B5dEa70fE65C',
+    router: '0x48f450475a8b501A7480C1Fd02935a7327F713Ad',
+    positionManager: '0xF699ec0764741f66F81068665eFFAeefA3c6037a',
+    pool: '0x...',      // Pool address (depends on token pair)
+    token0: '0x...',    // First token address
+    token1: '0x...'     // Second token address
 };
 
 async function main() {

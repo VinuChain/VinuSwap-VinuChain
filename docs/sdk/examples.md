@@ -12,12 +12,13 @@ import { encodePrice, priceToTick, nearestUsableTick } from './sdk/utils';
 // Configuration
 const config = {
     rpcUrl: 'https://rpc.vinuchain.org',
-    pool: '0x...',
-    quoter: '0x...',
-    router: '0x...',
-    positionManager: '0x...',
-    weth: '0x...',
-    usdc: '0x...'
+    factory: '0xd74dEe1C78D5C58FbdDe619b707fcFbAE50c3EEe',
+    quoter: '0xEed635Fa2343355d9bA726C379F2B5dEa70fE65C',
+    router: '0x48f450475a8b501A7480C1Fd02935a7327F713Ad',
+    positionManager: '0xF699ec0764741f66F81068665eFFAeefA3c6037a',
+    pool: '0x...',      // Pool address (depends on token pair)
+    weth: '0x...',      // WETH address on VinuChain
+    usdc: '0x...'       // USDC address on VinuChain
 };
 
 // Setup
