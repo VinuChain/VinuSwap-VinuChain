@@ -52,14 +52,14 @@ async function swapExactInputSingle(
     amountIn,
     slippagePercent = 0.5
 ) {
-    // 1. Get quote
-    const [quotedAmountOut] = await quoter.callStatic.quoteExactInputSingle(
+    // 1. Get quote (IQuoterV2 uses struct parameters)
+    const [quotedAmountOut] = await quoter.callStatic.quoteExactInputSingle({
         tokenIn,
         tokenOut,
-        fee,
         amountIn,
-        0  // No price limit
-    );
+        fee,
+        sqrtPriceLimitX96: 0
+    });
 
     // 2. Calculate minimum output with slippage
     const slippageBps = slippagePercent * 100;
@@ -90,9 +90,9 @@ async function swapExactInputSingle(
     return receipt;
 }
 
-// Usage: Swap 1 WETH for USDC
+// Usage: Swap 1 WVC for USDT
 const amountIn = ethers.utils.parseEther('1');
-await swapExactInputSingle(WETH, USDC, 3000, amountIn);
+await swapExactInputSingle(WVC, USDT, 3000, amountIn);
 ```
 
 ### Exact Output Single
@@ -107,14 +107,14 @@ async function swapExactOutputSingle(
     amountOut,
     slippagePercent = 0.5
 ) {
-    // 1. Get quote for required input
-    const [quotedAmountIn] = await quoter.callStatic.quoteExactOutputSingle(
+    // 1. Get quote for required input (IQuoterV2 uses struct parameters)
+    const [quotedAmountIn] = await quoter.callStatic.quoteExactOutputSingle({
         tokenIn,
         tokenOut,
+        amount: amountOut,
         fee,
-        amountOut,
-        0
-    );
+        sqrtPriceLimitX96: 0
+    });
 
     // 2. Calculate maximum input with slippage
     const slippageBps = slippagePercent * 100;
@@ -145,9 +145,9 @@ async function swapExactOutputSingle(
     return receipt;
 }
 
-// Usage: Get exactly 2000 USDC
+// Usage: Get exactly 2000 USDT
 const amountOut = ethers.utils.parseUnits('2000', 6);
-await swapExactOutputSingle(WETH, USDC, 3000, amountOut);
+await swapExactOutputSingle(WVC, USDT, 3000, amountOut);
 ```
 
 ## Multi-Hop Swaps
@@ -172,10 +172,10 @@ function encodePath(tokens, fees) {
     return path;
 }
 
-// Example: WETH → USDC → DAI
+// Example: WVC → USDT → TOKEN_C
 const path = encodePath(
-    [WETH, USDC, DAI],
-    [3000, 500]  // WETH/USDC 0.3%, USDC/DAI 0.05%
+    [WVC, USDT, TOKEN_C],
+    [3000, 500]  // WVC/USDT 0.3%, USDT/TOKEN_C 0.05%
 );
 ```
 
@@ -217,9 +217,9 @@ async function swapExactInput(
     return await tx.wait();
 }
 
-// Usage: Swap WETH → USDC → DAI
+// Usage: Swap WVC → USDT → TOKEN_C
 await swapExactInput(
-    [WETH, USDC, DAI],
+    [WVC, USDT, TOKEN_C],
     [3000, 500],
     ethers.utils.parseEther('1')
 );
@@ -269,16 +269,16 @@ async function swapExactOutput(
 }
 ```
 
-## Swapping with Native Token (ETH)
+## Swapping with Native Token (VC)
 
-### ETH → Token
+### VC → Token
 
-Send ETH with the transaction:
+Send VC with the transaction:
 
 ```javascript
-async function swapETHForTokens(tokenOut, fee, amountIn) {
+async function swapVCForTokens(tokenOut, fee, amountIn) {
     const params = {
-        tokenIn: WETH,  // Use WETH address
+        tokenIn: WVC,  // Use WVC address
         tokenOut,
         fee,
         recipient: signer.address,
@@ -288,18 +288,18 @@ async function swapETHForTokens(tokenOut, fee, amountIn) {
         sqrtPriceLimitX96: 0
     };
 
-    // Send ETH value with transaction
+    // Send VC value with transaction
     const tx = await router.exactInputSingle(params, { value: amountIn });
     return await tx.wait();
 }
 ```
 
-### Token → ETH
+### Token → VC
 
 Use multicall to swap and unwrap:
 
 ```javascript
-async function swapTokensForETH(tokenIn, fee, amountIn) {
+async function swapTokensForVC(tokenIn, fee, amountIn) {
     // Approve
     const token = new ethers.Contract(tokenIn, erc20ABI, signer);
     await token.approve(router.address, amountIn);
@@ -307,7 +307,7 @@ async function swapTokensForETH(tokenIn, fee, amountIn) {
     // Swap params - recipient is zero address to trigger unwrap
     const swapParams = {
         tokenIn,
-        tokenOut: WETH,
+        tokenOut: WVC,
         fee,
         recipient: ethers.constants.AddressZero,  // Will unwrap
         deadline: Math.floor(Date.now() / 1000) + 1800,
@@ -319,7 +319,7 @@ async function swapTokensForETH(tokenIn, fee, amountIn) {
     // Encode multicall
     const calls = [
         router.interface.encodeFunctionData('exactInputSingle', [swapParams]),
-        router.interface.encodeFunctionData('unwrapWETH9', [
+        router.interface.encodeFunctionData('unwrapWVC', [
             0,  // amountMinimum (add slippage)
             signer.address  // recipient
         ])
@@ -401,10 +401,10 @@ async function findBestRoute(tokenIn, tokenOut, amountIn) {
         { tokens: [tokenIn, tokenOut], fees: [100] },
         { tokens: [tokenIn, tokenOut], fees: [500] },
         { tokens: [tokenIn, tokenOut], fees: [3000] },
-        // Via WETH
-        { tokens: [tokenIn, WETH, tokenOut], fees: [3000, 3000] },
-        // Via USDC
-        { tokens: [tokenIn, USDC, tokenOut], fees: [500, 500] },
+        // Via WVC
+        { tokens: [tokenIn, WVC, tokenOut], fees: [3000, 3000] },
+        // Via USDT
+        { tokens: [tokenIn, USDT, tokenOut], fees: [500, 500] },
     ];
 
     let bestRoute = null;
@@ -414,13 +414,13 @@ async function findBestRoute(tokenIn, tokenOut, amountIn) {
         try {
             let output;
             if (route.tokens.length === 2) {
-                [output] = await quoter.callStatic.quoteExactInputSingle(
-                    route.tokens[0],
-                    route.tokens[1],
-                    route.fees[0],
+                [output] = await quoter.callStatic.quoteExactInputSingle({
+                    tokenIn: route.tokens[0],
+                    tokenOut: route.tokens[1],
                     amountIn,
-                    0
-                );
+                    fee: route.fees[0],
+                    sqrtPriceLimitX96: 0
+                });
             } else {
                 const path = encodePath(route.tokens, route.fees);
                 [output] = await quoter.callStatic.quoteExactInput(path, amountIn);

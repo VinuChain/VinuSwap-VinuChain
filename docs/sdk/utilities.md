@@ -2,18 +2,20 @@
 
 Helper functions for price calculations and conversions.
 
+**Source:** `sdk/utils.ts`
+
 ## Price Encoding
 
 ### encodePrice
 
-Converts a decimal price to sqrtPriceX96 format.
+Converts a decimal price ratio to sqrtPriceX96 format.
 
 ```typescript
-function encodePrice(price: number): BigNumber
+function encodePrice(ratio: string): BigNumber
 ```
 
 **Parameters:**
-- `price` - Decimal price (token1/token0)
+- `ratio` - Decimal price ratio as a string (token1/token0)
 
 **Returns:**
 - `BigNumber` - sqrtPriceX96 format
@@ -23,281 +25,236 @@ function encodePrice(price: number): BigNumber
 ```typescript
 import { encodePrice } from './sdk/utils';
 
-// 1 ETH = 2000 USDC
-const sqrtPriceX96 = encodePrice(2000);
+// 1 WVC = 0.5 USDT (USDT is token0, WVC is token1)
+const sqrtPriceX96 = encodePrice('0.5');
+
+// For more precision
+const sqrtPriceX96Precise = encodePrice('2000.50');
 ```
+
+**Note:** The ratio parameter is a string to preserve precision for very large or very small numbers.
+
+---
 
 ### decodePrice
 
-Converts sqrtPriceX96 to decimal price.
+Converts sqrtPriceX96 to a decimal price ratio.
 
 ```typescript
-function decodePrice(sqrtPriceX96: BigNumber): number
+function decodePrice(price: BigNumber): string
 ```
 
 **Parameters:**
-- `sqrtPriceX96` - Price in Q64.96 format
+- `price` - Price in sqrtPriceX96 (Q64.96) format
 
 **Returns:**
-- `number` - Decimal price
+- `string` - Decimal price ratio as a string
 
 **Example:**
 
 ```typescript
+import { decodePrice } from './sdk/utils';
+
 const price = decodePrice(sqrtPriceX96);
-console.log('Price:', price); // 2000
+console.log('Price:', price); // "2000"
 ```
 
-## Tick Utilities
+**Note:** Returns a string to preserve precision.
 
-### priceToTick
-
-Converts a price to the nearest tick.
-
-```typescript
-function priceToTick(price: number): number
-```
-
-**Formula:** `tick = floor(log(price) / log(1.0001))`
-
-**Example:**
-
-```typescript
-const tick = priceToTick(2000);
-// tick ≈ 75862
-```
-
-### tickToPrice
-
-Converts a tick to its corresponding price.
-
-```typescript
-function tickToPrice(tick: number): number
-```
-
-**Formula:** `price = 1.0001^tick`
-
-**Example:**
-
-```typescript
-const price = tickToPrice(75862);
-// price ≈ 2000
-```
-
-### nearestUsableTick
-
-Rounds a tick to the nearest valid tick based on tick spacing.
-
-```typescript
-function nearestUsableTick(tick: number, tickSpacing: number): number
-```
-
-**Example:**
-
-```typescript
-// For 0.3% fee pools (tickSpacing = 60)
-const usableTick = nearestUsableTick(75862, 60);
-// usableTick = 75840
-```
-
-## Path Encoding
-
-### encodePath
-
-Encodes a multi-hop swap path.
-
-```typescript
-function encodePath(tokens: string[], fees: number[]): string
-```
-
-**Parameters:**
-- `tokens` - Array of token addresses
-- `fees` - Array of fee tiers between each hop
-
-**Returns:**
-- `string` - Encoded path as hex string
-
-**Example:**
-
-```typescript
-// WETH → USDC → DAI
-const path = encodePath(
-    [WETH, USDC, DAI],
-    [3000, 500]  // WETH/USDC 0.3%, USDC/DAI 0.05%
-);
-```
-
-### decodePath
-
-Decodes an encoded path back to tokens and fees.
-
-```typescript
-function decodePath(path: string): { tokens: string[], fees: number[] }
-```
-
-## Liquidity Math
-
-### getLiquidityForAmounts
-
-Calculates liquidity from token amounts.
-
-```typescript
-function getLiquidityForAmounts(
-    sqrtPriceX96: BigNumber,
-    sqrtRatioAX96: BigNumber,
-    sqrtRatioBX96: BigNumber,
-    amount0: BigNumber,
-    amount1: BigNumber
-): BigNumber
-```
-
-### getAmountsForLiquidity
-
-Calculates token amounts from liquidity.
-
-```typescript
-function getAmountsForLiquidity(
-    sqrtPriceX96: BigNumber,
-    sqrtRatioAX96: BigNumber,
-    sqrtRatioBX96: BigNumber,
-    liquidity: BigNumber
-): { amount0: BigNumber, amount1: BigNumber }
-```
+---
 
 ## Custom Tick Spacing
 
 ### withCustomTickSpacing
 
-Creates utilities for custom tick spacing.
+Temporarily overrides the Uniswap SDK's tick spacing for a fee tier while executing a function.
 
 ```typescript
-function withCustomTickSpacing(tickSpacing: number): {
-    nearestTick: (tick: number) => number;
-    validTicks: (lower: number, upper: number) => { tickLower: number, tickUpper: number };
-}
+async function withCustomTickSpacing<T>(
+    fee: number,
+    tickSpacing: number,
+    f: (() => Promise<T>) | (() => T)
+): Promise<T>
 ```
+
+**Parameters:**
+- `fee` - Fee tier (e.g., 500, 3000, 10000)
+- `tickSpacing` - Custom tick spacing to use
+- `f` - Function to execute with the custom tick spacing
+
+**Returns:**
+- `Promise<T>` - Result of the function execution
 
 **Example:**
 
 ```typescript
-const utils = withCustomTickSpacing(60);
+import { withCustomTickSpacing } from './sdk/utils';
+import { Pool, Position } from '@uniswap/v3-sdk';
 
-// Get nearest valid tick
-const tick = utils.nearestTick(75862);
+// VinuSwap allows custom tick spacing, but Uniswap SDK expects specific values
+// Use withCustomTickSpacing to temporarily override the SDK's expectations
 
-// Get valid range
-const range = utils.validTicks(-100, 100);
+const position = await withCustomTickSpacing(3000, 60, () => {
+    // Inside this function, the Uniswap SDK will use tickSpacing=60 for fee=3000
+    return Position.fromAmounts({
+        pool: pool,
+        tickLower: -60,
+        tickUpper: 60,
+        amount0: amount0.toString(),
+        amount1: amount1.toString(),
+        useFullPrecision: true
+    });
+});
 ```
 
-## Constants
+**Use Case:**
+
+VinuSwap allows custom tick spacing per pool, unlike Uniswap V3 which has fixed tick spacing per fee tier. This utility lets you use the Uniswap SDK with VinuSwap's custom configurations.
+
+---
+
+## FixedMathBN
+
+A bignumber.js instance configured for high-precision decimal math.
 
 ```typescript
-// Tick bounds
-const MIN_TICK = -887272;
-const MAX_TICK = 887272;
-
-// Price bounds (Q64.96)
-const MIN_SQRT_RATIO = BigNumber.from('4295128739');
-const MAX_SQRT_RATIO = BigNumber.from('1461446703485210103287273052203988822378723970342');
-
-// Q96 multiplier
-const Q96 = BigNumber.from(2).pow(96);
+const FixedMathBN = bn.clone({ DECIMAL_PLACES: 40, EXPONENTIAL_AT: 999999 });
 ```
 
-## BigNumber Helpers
-
-### formatSqrtPriceX96
-
-Formats sqrtPriceX96 for display.
-
-```typescript
-function formatSqrtPriceX96(sqrtPriceX96: BigNumber, decimals0: number, decimals1: number): string
-```
+**Configuration:**
+- `DECIMAL_PLACES: 40` - 40 decimal places of precision
+- `EXPONENTIAL_AT: 999999` - Prevents scientific notation for large numbers
 
 **Example:**
 
 ```typescript
-const formattedPrice = formatSqrtPriceX96(sqrtPriceX96, 18, 6);
-// "2000.00 USDC/ETH"
+import { FixedMathBN } from './sdk/utils';
+
+// High precision calculations
+const price = new FixedMathBN('79228162514264337593543950336');
+const sqrtPrice = price.sqrt();
+const ratio = sqrtPrice.dividedBy(new FixedMathBN(2).pow(96)).pow(2);
+
+console.log(ratio.toString()); // Full precision output
 ```
+
+---
 
 ## Usage Examples
 
-### Price Range Calculation
+### Complete Price Conversion Flow
 
 ```typescript
-import { priceToTick, nearestUsableTick, tickToPrice } from './sdk/utils';
+import { encodePrice, decodePrice } from './sdk/utils';
 
-function createPriceRange(
-    currentPrice: number,
-    lowerPrice: number,
-    upperPrice: number,
-    tickSpacing: number
+// Encode a price for pool initialization
+const initialPrice = '0.5'; // 1 WVC = 0.5 USDT
+const sqrtPriceX96 = encodePrice(initialPrice);
+
+// Later, decode the price from the pool
+const currentPrice = decodePrice(sqrtPriceX96);
+console.log('Current price:', currentPrice);
+```
+
+### Working with Uniswap SDK
+
+```typescript
+import { withCustomTickSpacing, encodePrice } from './sdk/utils';
+import { Pool, Position, nearestUsableTick } from '@uniswap/v3-sdk';
+import { Token } from '@uniswap/sdk-core';
+
+async function createPosition(
+    token0: Token,
+    token1: Token,
+    fee: number,
+    tickSpacing: number,
+    sqrtPriceX96: BigNumber,
+    tickLower: number,
+    tickUpper: number,
+    amount0: BigNumber,
+    amount1: BigNumber
 ) {
-    const currentTick = priceToTick(currentPrice);
-    const tickLower = nearestUsableTick(priceToTick(lowerPrice), tickSpacing);
-    const tickUpper = nearestUsableTick(priceToTick(upperPrice), tickSpacing);
+    return withCustomTickSpacing(fee, tickSpacing, () => {
+        // Create pool instance
+        const pool = new Pool(
+            token0,
+            token1,
+            fee,
+            sqrtPriceX96.toString(),
+            '0', // liquidity (not needed for position creation)
+            0    // tick (computed from sqrtPriceX96)
+        );
 
-    return {
-        currentTick,
-        tickLower,
-        tickUpper,
-        actualLowerPrice: tickToPrice(tickLower),
-        actualUpperPrice: tickToPrice(tickUpper)
-    };
+        // Snap ticks to valid values
+        const tickLowerUsable = nearestUsableTick(tickLower, tickSpacing);
+        const tickUpperUsable = nearestUsableTick(tickUpper, tickSpacing);
+
+        // Create position
+        return Position.fromAmounts({
+            pool,
+            tickLower: tickLowerUsable,
+            tickUpper: tickUpperUsable,
+            amount0: amount0.toString(),
+            amount1: amount1.toString(),
+            useFullPrecision: true
+        });
+    });
 }
-
-// Example: Create range around current price
-const range = createPriceRange(2000, 1800, 2200, 60);
 ```
 
-### Multi-Hop Path Building
+### Price Calculations with FixedMathBN
 
 ```typescript
-function buildOptimalPath(
-    tokenIn: string,
-    tokenOut: string,
-    intermediates: string[],
-    preferredFees: number[] = [500, 3000, 10000]
-): string[] {
-    // Try direct paths first
-    const directPaths = preferredFees.map(fee =>
-        encodePath([tokenIn, tokenOut], [fee])
-    );
+import { FixedMathBN } from './sdk/utils';
+import { BigNumber } from '@ethersproject/bignumber';
 
-    // Then try intermediate paths
-    const intermediatePaths = intermediates.flatMap(intermediate =>
-        preferredFees.flatMap(fee1 =>
-            preferredFees.map(fee2 =>
-                encodePath([tokenIn, intermediate, tokenOut], [fee1, fee2])
-            )
-        )
-    );
+// Convert sqrtPriceX96 to human-readable price manually
+function sqrtPriceX96ToPrice(
+    sqrtPriceX96: BigNumber,
+    decimals0: number,
+    decimals1: number
+): string {
+    const Q96 = new FixedMathBN(2).pow(96);
+    const sqrtPrice = new FixedMathBN(sqrtPriceX96.toString());
 
-    return [...directPaths, ...intermediatePaths];
+    // price = (sqrtPrice / 2^96)^2
+    const price = sqrtPrice.dividedBy(Q96).pow(2);
+
+    // Adjust for decimal differences
+    const decimalAdjustment = new FixedMathBN(10).pow(decimals0 - decimals1);
+    const adjustedPrice = price.multipliedBy(decimalAdjustment);
+
+    return adjustedPrice.toString();
 }
+
+// Example: USDT (6 decimals) / WVC (18 decimals)
+const humanPrice = sqrtPriceX96ToPrice(sqrtPriceX96, 6, 18);
+console.log('Price:', humanPrice, 'USDT per WVC');
 ```
 
-### Slippage Calculation
+## Relationship to Uniswap SDK
+
+The VinuSwap SDK utilities are designed to work alongside the Uniswap V3 SDK. For additional functionality like:
+
+- Tick math (`nearestUsableTick`, `priceToClosestTick`, etc.)
+- Path encoding for multi-hop swaps
+- Liquidity calculations
+- Position management
+
+Use the `@uniswap/v3-sdk` package directly, with `withCustomTickSpacing` when needed:
 
 ```typescript
-function calculateSlippage(
-    expectedAmount: BigNumber,
-    slippagePercent: number
-): BigNumber {
-    const slippageBps = Math.floor(slippagePercent * 100);
-    return expectedAmount.mul(10000 - slippageBps).div(10000);
-}
+import { nearestUsableTick, priceToClosestTick, encodeSqrtRatioX96 } from '@uniswap/v3-sdk';
+import { withCustomTickSpacing } from './sdk/utils';
 
-// For exact input: minimum output
-const minOutput = calculateSlippage(expectedOutput, 0.5);
-
-// For exact output: maximum input
-function calculateMaxInput(
-    expectedInput: BigNumber,
-    slippagePercent: number
-): BigNumber {
-    const slippageBps = Math.floor(slippagePercent * 100);
-    return expectedInput.mul(10000 + slippageBps).div(10000);
-}
+// Use Uniswap SDK functions with custom tick spacing
+const usableTick = await withCustomTickSpacing(3000, 60, () => {
+    return nearestUsableTick(75862, 60);
+});
 ```
+
+## Related
+
+- [VinuSwap Class](vinuswap-class.md)
+- [Getting Started](getting-started.md)
+- [@uniswap/v3-sdk Documentation](https://docs.uniswap.org/sdk/v3/overview)

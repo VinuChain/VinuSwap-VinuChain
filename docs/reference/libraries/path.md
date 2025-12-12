@@ -105,16 +105,16 @@ function decodePath(path) {
 ## Usage Example
 
 ```javascript
-// Encode: WETH → USDC → DAI
+// Encode: WVC → USDT → TOKEN_C
 const path = encodePath(
-    [WETH, USDC, DAI],
+    [WVC, USDT, TOKEN_C],
     [3000, 500]  // 0.3%, 0.05%
 );
-// path = 0x[WETH]000bb8[USDC]0001f4[DAI]
+// path = 0x[WVC]000bb8[USDT]0001f4[TOKEN_C]
 
 // Decode
 const { tokens, fees } = decodePath(path);
-// tokens = [WETH, USDC, DAI]
+// tokens = [WVC, USDT, TOKEN_C]
 // fees = [3000, 500]
 ```
 

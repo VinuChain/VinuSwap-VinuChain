@@ -159,8 +159,8 @@ const tickUpper = 60000;
 const sqrtPriceAX96 = TickMath.getSqrtRatioAtTick(tickLower);
 const sqrtPriceBX96 = TickMath.getSqrtRatioAtTick(tickUpper);
 
-const amount0 = ethers.utils.parseUnits('1000', 6);  // 1000 USDC
-const amount1 = ethers.utils.parseEther('0.5');      // 0.5 WETH
+const amount0 = ethers.utils.parseUnits('1000', 6);  // 1000 USDT
+const amount1 = ethers.utils.parseEther('0.5');      // 0.5 WVC
 
 const liquidity = getLiquidityForAmounts(
     currentSqrtPriceX96,

@@ -35,11 +35,12 @@ VinuSwap defines numerous interfaces for contract interaction.
 
 ## Callback Interfaces
 
+**Note:** VinuSwap uses Uniswap V3 callback interface names for compatibility.
+
 | Interface | Purpose |
 |-----------|---------|
-| `IVinuSwapSwapCallback` | Swap callback |
-| `IVinuSwapMintCallback` | Mint callback |
-| `IVinuSwapFlashCallback` | Flash loan callback |
+| `IUniswapV3SwapCallback` | Swap callback |
+| `IUniswapV3MintCallback` | Mint callback |
 
 ## Key Interface Details
 
@@ -111,13 +112,6 @@ interface IVinuSwapPoolActions {
         uint160 sqrtPriceLimitX96,
         bytes calldata data
     ) external returns (int256 amount0, int256 amount1);
-
-    function flash(
-        address recipient,
-        uint256 amount0,
-        uint256 amount1,
-        bytes calldata data
-    ) external;
 
     function increaseObservationCardinalityNext(
         uint16 observationCardinalityNext
@@ -191,27 +185,21 @@ interface IFeeManager {
 
 ### Callback Interfaces
 
+VinuSwap uses Uniswap V3's callback interfaces for compatibility:
+
 ```solidity
-interface IVinuSwapSwapCallback {
-    function vinuSwapSwapCallback(
+interface IUniswapV3SwapCallback {
+    function uniswapV3SwapCallback(
         int256 amount0Delta,
         int256 amount1Delta,
         bytes calldata data
     ) external;
 }
 
-interface IVinuSwapMintCallback {
-    function vinuSwapMintCallback(
+interface IUniswapV3MintCallback {
+    function uniswapV3MintCallback(
         uint256 amount0Owed,
         uint256 amount1Owed,
-        bytes calldata data
-    ) external;
-}
-
-interface IVinuSwapFlashCallback {
-    function vinuSwapFlashCallback(
-        uint256 fee0,
-        uint256 fee1,
         bytes calldata data
     ) external;
 }
@@ -230,8 +218,8 @@ const router: ISwapRouter = ISwapRouter__factory.connect(
 );
 
 await router.exactInputSingle({
-    tokenIn: WETH,
-    tokenOut: USDC,
+    tokenIn: WVC,
+    tokenOut: USDT,
     fee: 3000,
     recipient: userAddress,
     deadline: deadline,

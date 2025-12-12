@@ -16,7 +16,6 @@
 * [Position Locking](guides/position-locking.md)
 * [Fee Discounts](guides/fee-discounts.md)
 * [Using the Quoter](guides/quoting.md)
-* [Flash Swaps](guides/flash-swaps.md)
 
 ## Core Contracts
 

@@ -17,14 +17,15 @@ The quoter helps you:
 ```javascript
 async function quoteExactInputSingle(tokenIn, tokenOut, fee, amountIn) {
     // IMPORTANT: Use callStatic for view-like behavior
+    // IQuoterV2 uses struct parameters
     const [amountOut, sqrtPriceX96After, ticksCrossed, gasEstimate] =
-        await quoter.callStatic.quoteExactInputSingle(
+        await quoter.callStatic.quoteExactInputSingle({
             tokenIn,
             tokenOut,
-            fee,
             amountIn,
-            0  // sqrtPriceLimitX96: 0 for no limit
-        );
+            fee,
+            sqrtPriceLimitX96: 0
+        });
 
     return {
         amountOut,
@@ -36,27 +37,28 @@ async function quoteExactInputSingle(tokenIn, tokenOut, fee, amountIn) {
 
 // Usage
 const quote = await quoteExactInputSingle(
-    WETH,
-    USDC,
+    WVC,
+    USDT,
     3000,
     ethers.utils.parseEther('1')
 );
 
-console.log('Expected output:', ethers.utils.formatUnits(quote.amountOut, 6), 'USDC');
+console.log('Expected output:', ethers.utils.formatUnits(quote.amountOut, 6), 'USDT');
 ```
 
 ### Quote Exact Output (Single Hop)
 
 ```javascript
 async function quoteExactOutputSingle(tokenIn, tokenOut, fee, amountOut) {
+    // IQuoterV2 uses struct parameters
     const [amountIn, sqrtPriceX96After, ticksCrossed, gasEstimate] =
-        await quoter.callStatic.quoteExactOutputSingle(
+        await quoter.callStatic.quoteExactOutputSingle({
             tokenIn,
             tokenOut,
+            amount: amountOut,
             fee,
-            amountOut,
-            0
-        );
+            sqrtPriceLimitX96: 0
+        });
 
     return {
         amountIn,
@@ -66,15 +68,15 @@ async function quoteExactOutputSingle(tokenIn, tokenOut, fee, amountOut) {
     };
 }
 
-// Usage: How much WETH needed for 2000 USDC?
+// Usage: How much WVC needed for 2000 USDT?
 const quote = await quoteExactOutputSingle(
-    WETH,
-    USDC,
+    WVC,
+    USDT,
     3000,
     ethers.utils.parseUnits('2000', 6)
 );
 
-console.log('Required input:', ethers.utils.formatEther(quote.amountIn), 'WETH');
+console.log('Required input:', ethers.utils.formatEther(quote.amountIn), 'WVC');
 ```
 
 ## Multi-Hop Quoting
@@ -92,8 +94,8 @@ function encodePath(tokens, fees) {
     return path;
 }
 
-// WETH → USDC → DAI
-const path = encodePath([WETH, USDC, DAI], [3000, 500]);
+// WVC → USDT → TOKEN_C
+const path = encodePath([WVC, USDT, TOKEN_C], [3000, 500]);
 ```
 
 ### Quote Multi-Hop Exact Input
@@ -147,9 +149,9 @@ async function findBestRoute(tokenIn, tokenOut, amountIn) {
         { path: [tokenIn, tokenOut], fees: [10000] }, // 1%
 
         // Two-hop routes
-        { path: [tokenIn, WETH, tokenOut], fees: [3000, 3000] },
-        { path: [tokenIn, USDC, tokenOut], fees: [500, 500] },
-        { path: [tokenIn, WETH, tokenOut], fees: [500, 3000] },
+        { path: [tokenIn, WVC, tokenOut], fees: [3000, 3000] },
+        { path: [tokenIn, USDT, tokenOut], fees: [500, 500] },
+        { path: [tokenIn, WVC, tokenOut], fees: [500, 3000] },
     ];
 
     const results = [];
@@ -159,9 +161,13 @@ async function findBestRoute(tokenIn, tokenOut, amountIn) {
             let amountOut, gasEstimate;
 
             if (route.path.length === 2) {
-                [amountOut, , , gasEstimate] = await quoter.callStatic.quoteExactInputSingle(
-                    route.path[0], route.path[1], route.fees[0], amountIn, 0
-                );
+                [amountOut, , , gasEstimate] = await quoter.callStatic.quoteExactInputSingle({
+                    tokenIn: route.path[0],
+                    tokenOut: route.path[1],
+                    amountIn,
+                    fee: route.fees[0],
+                    sqrtPriceLimitX96: 0
+                });
             } else {
                 const path = encodePath(route.path, route.fees);
                 [amountOut, , , gasEstimate] = await quoter.callStatic.quoteExactInput(
@@ -197,8 +203,8 @@ async function compareRoutesWithGas(tokenIn, tokenOut, amountIn) {
     return routes.map(r => ({
         ...r,
         gasCostWei: r.gasEstimate.mul(gasPrice),
-        gasCostETH: ethers.utils.formatEther(r.gasEstimate.mul(gasPrice)),
-        // Net output = amountOut - gasCost (if output is ETH)
+        gasCostVC: ethers.utils.formatEther(r.gasEstimate.mul(gasPrice)),
+        // Net output = amountOut - gasCost (if output is VC)
         netOutput: r.amountOut.sub(r.gasEstimate.mul(gasPrice))
     }));
 }
@@ -323,9 +329,13 @@ function useQuote(tokenIn, tokenOut, amountIn) {
 ```javascript
 async function safeQuote(tokenIn, tokenOut, fee, amountIn) {
     try {
-        const result = await quoter.callStatic.quoteExactInputSingle(
-            tokenIn, tokenOut, fee, amountIn, 0
-        );
+        const result = await quoter.callStatic.quoteExactInputSingle({
+            tokenIn,
+            tokenOut,
+            amountIn,
+            fee,
+            sqrtPriceLimitX96: 0
+        });
         return { success: true, ...result };
     } catch (error) {
         // Parse common errors
@@ -362,9 +372,13 @@ class QuoteCache {
         }
 
         const [amountOut, priceAfter, ticks, gas] =
-            await quoter.callStatic.quoteExactInputSingle(
-                tokenIn, tokenOut, fee, amountIn, 0
-            );
+            await quoter.callStatic.quoteExactInputSingle({
+                tokenIn,
+                tokenOut,
+                amountIn,
+                fee,
+                sqrtPriceLimitX96: 0
+            });
 
         const data = { amountOut, priceAfter, ticks, gas };
         this.cache.set(key, { data, timestamp: Date.now() });

@@ -101,7 +101,7 @@ async function createAndLockPosition(
 // Create position locked for 6 months
 const sixMonths = 180 * 24 * 60 * 60;
 await createAndLockPosition(
-    USDC, WETH, 3000, tickLower, tickUpper,
+    USDT, WVC, 3000, tickLower, tickUpper,
     ethers.utils.parseUnits('1000', 6),
     ethers.utils.parseEther('0.5'),
     sixMonths
@@ -234,12 +234,12 @@ Lock initial DEX liquidity to build trust:
 const oneYear = 365 * 24 * 60 * 60;
 await createAndLockPosition(
     PROJECT_TOKEN,
-    WETH,
+    WVC,
     10000,  // 1% fee for new token
     MIN_TICK,
     MAX_TICK,
     totalProjectTokenSupply.mul(20).div(100),  // 20% of supply
-    launchETHAmount,
+    launchVCAmount,
     oneYear
 );
 ```

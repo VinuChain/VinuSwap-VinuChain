@@ -95,17 +95,17 @@ console.log('Init code hash:', hash);
 ## Usage Example
 
 ```javascript
-// Compute WETH/USDC pool address
+// Compute WVC/USDT pool address
 const poolAddress = computePoolAddress(
     FACTORY_ADDRESS,
-    WETH,
-    USDC,
+    WVC,
+    USDT,
     3000  // 0.3% fee
 );
 
 // Verify
 const factoryContract = new ethers.Contract(FACTORY_ADDRESS, factoryABI, provider);
-const actualAddress = await factoryContract.getPool(WETH, USDC, 3000);
+const actualAddress = await factoryContract.getPool(WVC, USDT, 3000);
 
 console.log('Computed:', poolAddress);
 console.log('Actual:', actualAddress);

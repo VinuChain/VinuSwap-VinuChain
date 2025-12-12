@@ -144,13 +144,13 @@ async function verifySetup(sdk: VinuSwap) {
     console.log('Current tick:', slot0.tick);
 
     // Check quoter
-    const quote = await sdk.quoter.callStatic.quoteExactInputSingle(
-        sdk.token0,
-        sdk.token1,
-        3000,
-        ethers.utils.parseEther('1'),
-        0
-    );
+    const quote = await sdk.quoter.callStatic.quoteExactInputSingle({
+        tokenIn: sdk.token0,
+        tokenOut: sdk.token1,
+        fee: 3000,
+        amountIn: ethers.utils.parseEther('1'),
+        sqrtPriceLimitX96: 0
+    });
     console.log('Quote works:', quote[0].toString());
 
     // Check signer (if connected)

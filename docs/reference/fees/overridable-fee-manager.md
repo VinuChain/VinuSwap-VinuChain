@@ -21,10 +21,10 @@ address public defaultFeeManager;
 
 The fee manager used when no override is set for a pool.
 
-### overrides
+### feeManagerOverride
 
 ```solidity
-mapping(address => address) public overrides;
+mapping(address => address) public feeManagerOverride;
 ```
 
 Pool-specific fee manager overrides.
@@ -52,22 +52,21 @@ OverridableFeeManager manager = new OverridableFeeManager(
 ### computeFee
 
 ```solidity
-function computeFee(uint24 fee) external override returns (uint24)
+function computeFee(uint24 fee) external override nonReentrant returns (uint24)
 ```
 
 Routes fee computation to the appropriate manager.
 
+**Modifiers:** `nonReentrant` - Prevents reentrancy attacks via malicious fee managers
+
 **Logic:**
 
 ```solidity
-function computeFee(uint24 fee) external override returns (uint24) {
-    address manager = overrides[msg.sender];
-
-    if (manager == address(0)) {
-        manager = defaultFeeManager;
+function computeFee(uint24 fee) external override nonReentrant returns (uint24) {
+    if (feeManagerOverride[msg.sender] != address(0)) {
+        return IFeeManager(feeManagerOverride[msg.sender]).computeFee(fee);
     }
-
-    return IFeeManager(manager).computeFee(fee);
+    return IFeeManager(defaultFeeManager).computeFee(fee);
 }
 ```
 
@@ -89,10 +88,10 @@ Return computed fee
 
 ---
 
-### setOverride
+### setFeeManagerOverride
 
 ```solidity
-function setOverride(address pool, address feeManager) external onlyOwner
+function setFeeManagerOverride(address pool, address newFeeManager) external onlyOwner
 ```
 
 Sets a fee manager override for a specific pool.
@@ -104,16 +103,16 @@ Sets a fee manager override for a specific pool.
 | Name | Type | Description |
 |------|------|-------------|
 | `pool` | `address` | Pool address to override |
-| `feeManager` | `address` | Fee manager for this pool (address(0) to remove) |
+| `newFeeManager` | `address` | Fee manager for this pool (address(0) to remove override) |
 
 **Example:**
 
 ```javascript
 // Set override for stable pool (no discounts)
-await overridable.setOverride(stablePool.address, noDiscount.address);
+await overridable.setFeeManagerOverride(stablePool.address, noDiscount.address);
 
 // Remove override (revert to default)
-await overridable.setOverride(stablePool.address, ethers.constants.AddressZero);
+await overridable.setFeeManagerOverride(stablePool.address, ethers.constants.AddressZero);
 ```
 
 ---
@@ -149,20 +148,20 @@ const overridable = await OverridableFeeManager.deploy(tieredDiscount.address);
 
 // Create pools with the overridable manager
 const volatilePool = await factory.createPool(
-    ETH, USDC, 3000, 60, overridable.address
+    WVC, USDT, 3000, 60, overridable.address
 );
 
 const stablePool = await factory.createPool(
-    USDC, DAI, 100, 1, overridable.address
+    USDT, TOKEN_C, 100, 1, overridable.address
 );
 
-const whalePol = await factory.createPool(
-    ETH, BTC, 500, 10, overridable.address
+const whalePool = await factory.createPool(
+    WVC, TOKEN_D, 500, 10, overridable.address
 );
 
 // Configure overrides
-await overridable.setOverride(stablePool, noDiscount.address);  // No discount for stables
-await overridable.setOverride(whalePool, volumeDiscount.address);  // Volume-based for whales
+await overridable.setFeeManagerOverride(stablePool, noDiscount.address);  // No discount for stables
+await overridable.setFeeManagerOverride(whalePool, volumeDiscount.address);  // Volume-based for whales
 
 // Result:
 // - volatilePool → tieredDiscount (default)
@@ -179,7 +178,7 @@ const overridable = await OverridableFeeManager.deploy(noDiscount.address);
 // ... create pools ...
 
 // Later, enable discounts for specific pools
-await overridable.setOverride(popularPool, tieredDiscount.address);
+await overridable.setFeeManagerOverride(popularPool, tieredDiscount.address);
 
 // Eventually, make discounts the default
 await overridable.setDefaultFeeManager(tieredDiscount.address);
@@ -192,7 +191,7 @@ await overridable.setDefaultFeeManager(tieredDiscount.address);
 await overridable.setDefaultFeeManager(noDiscount.address);
 
 // Or disable for specific pool
-await overridable.setOverride(affectedPool, noDiscount.address);
+await overridable.setFeeManagerOverride(affectedPool, noDiscount.address);
 ```
 
 ## Configuration Examples
@@ -202,9 +201,8 @@ await overridable.setOverride(affectedPool, noDiscount.address);
 ```
 Default: TieredDiscount
 Overrides:
-  - USDC/USDT → NoDiscount
-  - USDC/DAI → NoDiscount
-  - DAI/USDT → NoDiscount
+  - USDT/STABLE_A → NoDiscount
+  - USDT/STABLE_B → NoDiscount
 ```
 
 ### Premium Pools
@@ -212,8 +210,8 @@ Overrides:
 ```
 Default: NoDiscount
 Overrides:
-  - ETH/USDC (main) → TieredDiscount
-  - BTC/ETH (main) → TieredDiscount
+  - WVC/USDT (main) → TieredDiscount
+  - TOKEN_A/WVC (main) → TieredDiscount
 ```
 
 ### Test vs Production
@@ -232,7 +230,7 @@ const defaultManager = await overridable.defaultFeeManager();
 console.log('Default:', defaultManager);
 
 // Check specific pool override
-const poolOverride = await overridable.overrides(poolAddress);
+const poolOverride = await overridable.feeManagerOverride(poolAddress);
 if (poolOverride === ethers.constants.AddressZero) {
     console.log('Pool uses default manager');
 } else {
@@ -241,7 +239,7 @@ if (poolOverride === ethers.constants.AddressZero) {
 
 // Determine actual manager for a pool
 async function getPoolFeeManager(pool) {
-    const override = await overridable.overrides(pool);
+    const override = await overridable.feeManagerOverride(pool);
     return override === ethers.constants.AddressZero
         ? await overridable.defaultFeeManager()
         : override;
@@ -264,6 +262,10 @@ With Override:
 
 ## Security Considerations
 
+### Reentrancy Protection
+
+The contract inherits from `ReentrancyGuard` and uses the `nonReentrant` modifier on `computeFee()` to prevent reentrancy attacks via malicious fee managers.
+
 ### Manager Validation
 
 The contract doesn't validate that override addresses implement IFeeManager:
@@ -274,7 +276,7 @@ require(
     IFeeManager(feeManager).computeFee(1000) > 0,
     "Invalid fee manager"
 );
-await overridable.setOverride(pool, feeManager);
+await overridable.setFeeManagerOverride(pool, feeManager);
 ```
 
 ### Access Control
@@ -290,23 +292,16 @@ All pools without overrides use the default:
 - Ensure default manager is well-tested
 - Be cautious changing default on live systems
 
-## Events
+## Inheritance
 
 ```solidity
-event OverrideSet(address indexed pool, address indexed feeManager);
-event DefaultFeeManagerUpdated(address indexed feeManager);
+contract OverridableFeeManager is IFeeManager, Ownable, ReentrancyGuard
 ```
 
-## Interface
-
-```solidity
-interface IOverridableFeeManager is IFeeManager {
-    function defaultFeeManager() external view returns (address);
-    function overrides(address pool) external view returns (address);
-    function setOverride(address pool, address feeManager) external;
-    function setDefaultFeeManager(address _defaultFeeManager) external;
-}
-```
+The contract inherits:
+- `IFeeManager` - Fee computation interface
+- `Ownable` - Access control for configuration
+- `ReentrancyGuard` - Reentrancy protection
 
 ## Related
 

@@ -11,7 +11,6 @@ Each pool is an independent market maker that:
 - Executes swaps between the paired tokens
 - Accumulates and distributes fees to liquidity providers
 - Maintains a TWAP oracle for price data
-- Supports flash loans
 
 ## State Variables
 
@@ -108,10 +107,12 @@ Oracle.Observation[65535] public override observations;
 ### initialize
 
 ```solidity
-function initialize(uint160 sqrtPriceX96) external override
+function initialize(uint160 sqrtPriceX96) external override onlyFactoryOwner
 ```
 
 Sets the initial price for the pool. Can only be called once.
+
+**Access Control:** Only callable by factory owner
 
 **Parameters:**
 
@@ -120,6 +121,7 @@ Sets the initial price for the pool. Can only be called once.
 | `sqrtPriceX96` | `uint160` | Initial √price in Q64.96 format |
 
 **Requirements:**
+- Caller must be factory owner
 - Pool must not already be initialized
 - `sqrtPriceX96` must be within valid tick range
 
@@ -168,7 +170,9 @@ Adds liquidity to a position.
 | `amount1` | `uint256` | Token1 amount required |
 
 **Callback:**
-The pool calls `IVinuSwapMintCallback.vinuSwapMintCallback(amount0, amount1, data)` on `msg.sender`. The caller must transfer the required tokens to the pool in this callback.
+The pool calls `IUniswapV3MintCallback.uniswapV3MintCallback(amount0, amount1, data)` on `msg.sender`. The caller must transfer the required tokens to the pool in this callback.
+
+**Note:** VinuSwap uses Uniswap V3's callback interfaces for compatibility.
 
 **Events Emitted:**
 - `Mint(sender, recipient, tickLower, tickUpper, amount, amount0, amount1)`
@@ -282,40 +286,10 @@ Executes a swap.
 | `zeroForOne = false` | Greater than current price, less than `MAX_SQRT_RATIO` |
 
 **Callback:**
-The pool calls `IVinuSwapSwapCallback.vinuSwapSwapCallback(amount0, amount1, data)` on `msg.sender`. The caller must transfer the required input tokens to the pool.
+The pool calls `IUniswapV3SwapCallback.uniswapV3SwapCallback(amount0, amount1, data)` on `msg.sender`. The caller must transfer the required input tokens to the pool.
 
 **Events Emitted:**
 - `Swap(sender, recipient, amount0, amount1, sqrtPriceX96, liquidity, tick)`
-
----
-
-### flash
-
-```solidity
-function flash(
-    address recipient,
-    uint256 amount0,
-    uint256 amount1,
-    bytes calldata data
-) external override lock
-```
-
-Executes a flash loan.
-
-**Parameters:**
-
-| Name | Type | Description |
-|------|------|-------------|
-| `recipient` | `address` | Token recipient |
-| `amount0` | `uint256` | Token0 amount to borrow |
-| `amount1` | `uint256` | Token1 amount to borrow |
-| `data` | `bytes` | Callback data |
-
-**Callback:**
-The pool calls `IVinuSwapFlashCallback.vinuSwapFlashCallback(fee0, fee1, data)` on `msg.sender`. The caller must return the borrowed amounts plus fees to the pool.
-
-**Events Emitted:**
-- `Flash(sender, recipient, amount0, amount1, paid0, paid1)`
 
 ---
 
@@ -499,19 +473,6 @@ event Collect(
 );
 ```
 
-### Flash
-
-```solidity
-event Flash(
-    address indexed sender,
-    address indexed recipient,
-    uint256 amount0,
-    uint256 amount1,
-    uint256 paid0,
-    uint256 paid1
-);
-```
-
 ### SetFeeProtocol
 
 ```solidity
@@ -548,8 +509,6 @@ event CollectProtocol(
 | `IIA` | Invalid input amount |
 | `SPL` | Invalid sqrt price limit |
 | `L` | Liquidity overflow |
-| `F0` | Flash callback didn't return token0 |
-| `F1` | Flash callback didn't return token1 |
 
 ## Constants
 

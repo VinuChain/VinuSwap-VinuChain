@@ -8,19 +8,13 @@ The Controller contract manages pool creation, protocol fee collection, and fee 
 
 The Controller provides:
 - Pool creation wrapper with ownership control
+- Standard pool creation with default parameters
 - Protocol fee collection from pools
 - Multi-account fee distribution with configurable shares
 - Pool initialization and fee configuration
+- Factory ownership management
 
 ## State Variables
-
-### factory
-
-```solidity
-IVinuSwapFactory public immutable factory;
-```
-
-Reference to the VinuSwap factory.
 
 ### accounts
 
@@ -33,10 +27,10 @@ Array of addresses receiving fee distributions.
 ### shares
 
 ```solidity
-uint256[] public shares;
+mapping(address => uint256) public shares;
 ```
 
-Distribution shares for each account (parallel array with accounts).
+Distribution shares for each account.
 
 ### totalShares
 
@@ -46,21 +40,26 @@ uint256 public totalShares;
 
 Sum of all shares (for proportional calculation).
 
-### balances
+### defaultFeeManager
 
 ```solidity
-mapping(address => mapping(address => uint256)) public balances;
+mapping(address => address) public defaultFeeManager;
 ```
 
-Mapping: `account → token → balance`
+Default fee manager for each factory (used by `createStandardPool`).
 
-Tracks pending withdrawals for each account and token.
+### defaultTickSpacing
+
+```solidity
+mapping(address => mapping(uint24 => int24)) public defaultTickSpacing;
+```
+
+Default tick spacing for each factory and fee tier (used by `createStandardPool`).
 
 ## Constructor
 
 ```solidity
 constructor(
-    address _factory,
     address[] memory _accounts,
     uint256[] memory _shares
 )
@@ -68,15 +67,19 @@ constructor(
 
 | Parameter | Description |
 |-----------|-------------|
-| `_factory` | VinuSwap factory address |
 | `_accounts` | Initial fee recipient addresses |
 | `_shares` | Initial distribution shares |
+
+**Requirements:**
+- At least one account required
+- Accounts and shares arrays must have same length
+- No zero addresses
+- All shares must be greater than zero
 
 **Example:**
 
 ```solidity
 Controller controller = new Controller(
-    factory.address,
     [treasury, devFund, burnAddress],  // Recipients
     [2, 2, 1]                          // 40%, 40%, 20%
 );
@@ -88,15 +91,17 @@ Controller controller = new Controller(
 
 ```solidity
 function createPool(
+    address factory,
     address tokenA,
     address tokenB,
     uint24 fee,
     int24 tickSpacing,
-    address feeManager
-) external onlyOwner returns (address pool)
+    address feeManager,
+    uint160 sqrtPriceX96
+) external onlyOwner nonReentrant returns (address pool)
 ```
 
-Creates a new pool via the factory.
+Creates and initializes a new pool via the specified factory.
 
 **Access Control:** Owner only
 
@@ -104,20 +109,97 @@ Creates a new pool via the factory.
 
 | Name | Type | Description |
 |------|------|-------------|
+| `factory` | `address` | Factory contract to use |
 | `tokenA` | `address` | First token |
 | `tokenB` | `address` | Second token |
 | `fee` | `uint24` | Pool fee |
 | `tickSpacing` | `int24` | Tick spacing |
 | `feeManager` | `address` | Fee manager contract |
+| `sqrtPriceX96` | `uint160` | Initial sqrt price |
 
-**Events:** `PoolCreated(pool, tokenA, tokenB, fee)`
+**Returns:** Address of the created pool
+
+**Events:** `PoolCreated(token0, token1, fee, factory, tickSpacing, feeManager, sqrtPriceX96, pool)`
+
+---
+
+### createStandardPool
+
+```solidity
+function createStandardPool(
+    address factory,
+    address tokenA,
+    address tokenB,
+    uint24 fee,
+    uint160 sqrtPriceX96
+) external nonReentrant returns (address pool)
+```
+
+Creates a pool using pre-configured default fee manager and tick spacing.
+
+**Access Control:** Any caller (uses pre-set defaults)
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `factory` | `address` | Factory contract to use |
+| `tokenA` | `address` | First token |
+| `tokenB` | `address` | Second token |
+| `fee` | `uint24` | Pool fee tier |
+| `sqrtPriceX96` | `uint160` | Initial sqrt price |
+
+**Requirements:**
+- Default fee manager must be set for the factory
+- Default tick spacing must be set for the factory/fee combination
+
+**Returns:** Address of the created pool
+
+---
+
+### setDefaultFeeManager
+
+```solidity
+function setDefaultFeeManager(address factory, address feeManager) external onlyOwner
+```
+
+Sets the default fee manager for standard pool creation.
+
+**Access Control:** Owner only
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `factory` | `address` | Factory address |
+| `feeManager` | `address` | Default fee manager (zero to disable) |
+
+---
+
+### setDefaultTickSpacing
+
+```solidity
+function setDefaultTickSpacing(address factory, uint24 fee, int24 tickSpacing) external onlyOwner
+```
+
+Sets the default tick spacing for standard pool creation.
+
+**Access Control:** Owner only
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `factory` | `address` | Factory address |
+| `fee` | `uint24` | Fee tier |
+| `tickSpacing` | `int24` | Default tick spacing (0 to disable, max 16383) |
 
 ---
 
 ### initialize
 
 ```solidity
-function initialize(address pool, uint160 sqrtPriceX96) external onlyOwner
+function initialize(address pool, uint160 sqrtPriceX96) external onlyOwner nonReentrant
 ```
 
 Initializes a pool with its starting price.
@@ -142,7 +224,7 @@ function setFeeProtocol(
     address pool,
     uint8 feeProtocol0,
     uint8 feeProtocol1
-) external onlyOwner
+) external onlyOwner nonReentrant
 ```
 
 Sets the protocol fee for a pool.
@@ -166,116 +248,129 @@ Sets the protocol fee for a pool.
 ```solidity
 function collectProtocolFees(
     address pool,
-    uint128 amount0Max,
-    uint128 amount1Max
-) external onlyOwner returns (uint128 amount0, uint128 amount1)
+    uint128 amount0Requested,
+    uint128 amount1Requested
+) external nonReentrant
 ```
 
 Collects protocol fees from a pool and distributes to accounts.
 
-**Access Control:** Owner only
+**Access Control:** Any account in the accounts array OR the owner
 
 **Parameters:**
 
 | Name | Type | Description |
 |------|------|-------------|
 | `pool` | `address` | Pool to collect from |
-| `amount0Max` | `uint128` | Maximum token0 to collect |
-| `amount1Max` | `uint128` | Maximum token1 to collect |
-
-**Returns:**
-
-| Name | Type | Description |
-|------|------|-------------|
-| `amount0` | `uint128` | Token0 amount collected |
-| `amount1` | `uint128` | Token1 amount collected |
+| `amount0Requested` | `uint128` | Maximum token0 to collect |
+| `amount1Requested` | `uint128` | Maximum token1 to collect |
 
 **Distribution Logic:**
 
 ```solidity
 for (uint i = 0; i < accounts.length; i++) {
-    balances[accounts[i]][token0] += amount0 * shares[i] / totalShares;
-    balances[accounts[i]][token1] += amount1 * shares[i] / totalShares;
+    _balances[accounts[i]][token0] += amount0 * shares[accounts[i]] / totalShares;
+    _balances[accounts[i]][token1] += amount1 * shares[accounts[i]] / totalShares;
 }
+// Dust (rounding remainder) goes to first account
 ```
 
-**Events:** `CollectedFees(pool, amount0, amount1)`
+**Events:** `CollectedFees(pool, token0, token1, amount0, amount1)`
 
 ---
 
 ### withdraw
 
 ```solidity
-function withdraw(address token) external returns (uint256 amount)
+function withdraw(address token, uint256 amount) external nonReentrant
 ```
 
 Withdraws accumulated fees for the caller.
 
-**Access Control:** Any account in the accounts array
+**Access Control:** Any caller with a balance
 
 **Parameters:**
 
 | Name | Type | Description |
 |------|------|-------------|
 | `token` | `address` | Token to withdraw |
+| `amount` | `uint256` | Amount to withdraw |
 
-**Returns:**
+**Requirements:**
+- Amount must be greater than zero
+- Caller must have sufficient balance
+
+**Events:** `Withdrawal(account, token, amount)`
+
+---
+
+### balanceOf
+
+```solidity
+function balanceOf(address account, address token) public view returns (uint256)
+```
+
+Returns the pending balance for an account.
+
+**Parameters:**
 
 | Name | Type | Description |
 |------|------|-------------|
-| `amount` | `uint256` | Amount withdrawn |
+| `account` | `address` | Account address |
+| `token` | `address` | Token address |
 
-**Events:** `Withdrawal(msg.sender, token, amount)`
-
----
-
-### addAccount
-
-```solidity
-function addAccount(address account, uint256 share) external onlyOwner
-```
-
-Adds a new account to fee distribution.
-
-**Access Control:** Owner only
+**Returns:** Pending balance
 
 ---
 
-### removeAccount
+### transferFactoryOwnership
 
 ```solidity
-function removeAccount(address account) external onlyOwner
+function transferFactoryOwnership(address factory, address newOwner) external onlyOwner nonReentrant
 ```
 
-Removes an account from fee distribution.
+Transfers ownership of a factory to a new address.
 
 **Access Control:** Owner only
 
-**Note:** Account must withdraw pending balances first.
+**Parameters:**
 
----
-
-### updateShare
-
-```solidity
-function updateShare(address account, uint256 newShare) external onlyOwner
-```
-
-Updates an account's distribution share.
-
-**Access Control:** Owner only
+| Name | Type | Description |
+|------|------|-------------|
+| `factory` | `address` | Factory address |
+| `newOwner` | `address` | New owner address |
 
 ## Events
 
 ```solidity
-event PoolCreated(address indexed pool, address token0, address token1, uint24 fee);
-event Initialize(address indexed pool, uint160 sqrtPriceX96);
+event CollectedFees(
+    address indexed pool,
+    address indexed token0,
+    address indexed token1,
+    uint256 amount0,
+    uint256 amount1
+);
+
+event Withdrawal(
+    address indexed account,
+    address indexed token,
+    uint256 amount
+);
+
+event PoolCreated(
+    address indexed token0,
+    address indexed token1,
+    uint24 indexed fee,
+    address factory,
+    int24 tickSpacing,
+    address feeManager,
+    uint160 sqrtPriceX96,
+    address pool
+);
+
 event SetFeeProtocol(address indexed pool, uint8 feeProtocol0, uint8 feeProtocol1);
-event CollectedFees(address indexed pool, uint128 amount0, uint128 amount1);
-event Withdrawal(address indexed account, address indexed token, uint256 amount);
-event AccountAdded(address indexed account, uint256 share);
-event AccountRemoved(address indexed account);
-event ShareUpdated(address indexed account, uint256 oldShare, uint256 newShare);
+
+event Initialize(address indexed pool, uint160 sqrtPriceX96);
 ```
 
 ## Usage Examples
@@ -285,7 +380,6 @@ event ShareUpdated(address indexed account, uint256 oldShare, uint256 newShare);
 ```javascript
 // Deploy Controller with fee distribution
 const controller = await Controller.deploy(
-    factory.address,
     [
         treasury.address,    // DAO treasury
         devFund.address,     // Development fund
@@ -296,44 +390,55 @@ const controller = await Controller.deploy(
 
 // Transfer factory ownership to controller
 await factory.setOwner(controller.address);
+
+// Set up defaults for standard pool creation
+await controller.setDefaultFeeManager(factory.address, tieredDiscount.address);
+await controller.setDefaultTickSpacing(factory.address, 3000, 60);  // 0.3% fee → 60 tick spacing
+await controller.setDefaultTickSpacing(factory.address, 500, 10);   // 0.05% fee → 10 tick spacing
 ```
 
-### Pool Lifecycle
+### Pool Creation
 
 ```javascript
-// 1. Create pool
+// Option 1: Create pool with full control (owner only)
 const poolAddress = await controller.createPool(
-    WETH, USDC, 3000, 60, tieredDiscount.address
+    factory.address,
+    WVC,
+    USDT,
+    3000,                    // 0.3% fee
+    60,                      // tick spacing
+    tieredDiscount.address,  // fee manager
+    sqrtPriceX96             // initial price
 );
 
-// 2. Initialize with starting price
-const sqrtPriceX96 = encodeSqrtRatioX96(2000, 1);  // 1 ETH = 2000 USDC
-await controller.initialize(poolAddress, sqrtPriceX96);
-
-// 3. Set protocol fee (20%)
-await controller.setFeeProtocol(poolAddress, 5, 5);
+// Option 2: Create standard pool (anyone, uses defaults)
+const standardPool = await controller.createStandardPool(
+    factory.address,
+    WVC,
+    USDT,
+    3000,        // 0.3% fee (tick spacing from defaults)
+    sqrtPriceX96 // initial price
+);
 ```
 
 ### Fee Collection Workflow
 
 ```javascript
-// Collect from all pools periodically
+// Any account or owner can collect fees
 const pools = [pool1, pool2, pool3];
 
 for (const pool of pools) {
-    const [amount0, amount1] = await controller.collectProtocolFees(
+    await controller.collectProtocolFees(
         pool,
         ethers.constants.MaxUint128,
         ethers.constants.MaxUint128
     );
-    console.log(`Collected from ${pool}: ${amount0}, ${amount1}`);
 }
 
 // Each account withdraws their share
-for (const account of [treasury, devFund]) {
-    const signer = await ethers.getSigner(account);
-    await controller.connect(signer).withdraw(WETH);
-    await controller.connect(signer).withdraw(USDC);
+const myBalance = await controller.balanceOf(myAddress, WVC);
+if (myBalance.gt(0)) {
+    await controller.withdraw(WVC, myBalance);
 }
 ```
 
@@ -341,28 +446,13 @@ for (const account of [treasury, devFund]) {
 
 ```javascript
 // Check pending balance for an account
-const pendingWETH = await controller.balances(treasury.address, WETH);
-const pendingUSDC = await controller.balances(treasury.address, USDC);
+const pendingWVC = await controller.balanceOf(treasury.address, WVC);
+const pendingUSDT = await controller.balanceOf(treasury.address, USDT);
 
 console.log('Treasury pending:', {
-    WETH: ethers.utils.formatEther(pendingWETH),
-    USDC: ethers.utils.formatUnits(pendingUSDC, 6)
+    WVC: ethers.utils.formatEther(pendingWVC),
+    USDT: ethers.utils.formatUnits(pendingUSDT, 6)
 });
-```
-
-### Modifying Distribution
-
-```javascript
-// Add new account
-await controller.addAccount(newPartner.address, 1);  // Now: 2, 2, 1, 1 = 6 total
-
-// Update existing share
-await controller.updateShare(devFund.address, 3);  // Now: 2, 3, 1, 1 = 7 total
-
-// Remove account (must withdraw first)
-await controller.connect(burnAddress).withdraw(WETH);
-await controller.connect(burnAddress).withdraw(USDC);
-await controller.removeAccount(burnAddress);
 ```
 
 ## Distribution Calculation
@@ -374,10 +464,10 @@ Accounts: [Treasury, DevFund, Burn]
 Shares:   [2, 2, 1]
 Total:    5
 
-Distribution of 100 USDC:
-- Treasury: 100 * 2/5 = 40 USDC
-- DevFund:  100 * 2/5 = 40 USDC
-- Burn:     100 * 1/5 = 20 USDC
+Distribution of 100 USDT:
+- Treasury: 100 * 2/5 = 40 USDT
+- DevFund:  100 * 2/5 = 40 USDT
+- Burn:     100 * 1/5 = 20 USDT
 ```
 
 ### Rounding
@@ -391,7 +481,7 @@ Amount: 10 tokens
 Each account: 10 / 3 = 3 tokens
 Lost to rounding: 10 - (3 * 3) = 1 token
 
-Note: Lost tokens remain in controller contract
+Note: Rounding dust is given to the first account
 ```
 
 ## Security Considerations
@@ -399,28 +489,28 @@ Note: Lost tokens remain in controller contract
 ### Owner Privileges
 
 The owner can:
-- Create pools
+- Create pools with custom parameters
 - Set protocol fees
-- Collect and distribute fees
-- Add/remove accounts
-- Change shares
+- Initialize pools
+- Set default parameters for standard pools
+- Transfer factory ownership
 
 **Recommendations:**
 - Use multisig for owner address
 - Add timelock for configuration changes
 - Consider governance for major decisions
 
-### Withdrawal Security
+### Fee Collection
 
-- Only accounts in the array can withdraw
+- Any registered account OR the owner can trigger fee collection
+- Fees are automatically distributed to all accounts based on shares
 - Each account can only withdraw their own balance
-- Balances are tracked per token
 
-### Fee Collection Timing
+### Account Configuration
 
-- Anyone can see pending protocol fees in pools
-- Collect regularly to distribute to accounts
-- Consider automated collection via keeper
+- Accounts and shares are set at construction time
+- There is no public function to add/remove accounts after deployment
+- Consider deploying a new Controller if account changes are needed
 
 ## Integration with Factory
 
@@ -433,6 +523,7 @@ Controller Owner
   Controller ────owns────▶ Factory
       │                        │
       │ createPool()           │ creates
+      │ createStandardPool()   │
       │ setFeeProtocol()       │
       ▼                        ▼
   Protocol Fees ◀─────── VinuSwapPools

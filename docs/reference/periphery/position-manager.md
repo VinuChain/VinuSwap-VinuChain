@@ -20,8 +20,9 @@ NonfungiblePositionManager
 ├── Multicall
 ├── ERC721Permit
 ├── PeripheryImmutableState
-├── PoolInitializer
-└── LiquidityManagement
+├── LiquidityManagement
+├── PeripheryValidation
+└── SelfPermit
 ```
 
 ## Position Struct
@@ -107,8 +108,8 @@ struct MintParams {
 
 ```javascript
 const params = {
-    token0: USDC,           // Must be sorted
-    token1: WETH,
+    token0: USDT,           // Must be sorted
+    token1: WVC,
     fee: 3000,
     tickLower: -60000,      // Must be divisible by tickSpacing
     tickUpper: 60000,
@@ -327,14 +328,42 @@ function positions(uint256 tokenId)
         uint128 liquidity,
         uint256 feeGrowthInside0LastX128,
         uint256 feeGrowthInside1LastX128,
-        uint128 tokensOwed0,
-        uint128 tokensOwed1
+        uint256 lockedUntil
     )
 ```
 
 Returns position data for a given NFT ID.
 
-**Note:** Does not return `lockedUntil`. Use internal `_positions` mapping or events to track lock status.
+**Note:** Returns `lockedUntil` instead of `tokensOwed`. Use `tokensOwed(tokenId)` to get uncollected token amounts.
+
+---
+
+### tokensOwed
+
+```solidity
+function tokensOwed(uint256 tokenId)
+    external
+    view
+    returns (
+        uint128 tokensOwed0,
+        uint128 tokensOwed1
+    )
+```
+
+Returns uncollected tokens for a position.
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `tokenId` | `uint256` | Position NFT ID |
+
+**Returns:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `tokensOwed0` | `uint128` | Uncollected token0 |
+| `tokensOwed1` | `uint128` | Uncollected token1 |
 
 ## Events
 
@@ -394,13 +423,13 @@ event Lock(
 
 ## Common Patterns
 
-### Create Position with ETH
+### Create Position with VC
 
 ```javascript
-// Token0 is WETH
+// Token0 is WVC
 const params = {
-    token0: WETH9,
-    token1: USDC,
+    token0: WVC,
+    token1: USDT,
     fee: 3000,
     tickLower: -60000,
     tickUpper: 60000,
@@ -412,7 +441,7 @@ const params = {
     deadline: deadline
 };
 
-// Send ETH with transaction
+// Send VC with transaction
 await positionManager.mint(params, { value: params.amount0Desired });
 ```
 

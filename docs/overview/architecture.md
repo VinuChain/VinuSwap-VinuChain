@@ -49,7 +49,7 @@ VinuSwap follows a layered architecture separating core AMM logic from user-faci
 │  │  │ feeProtocol │  │              │  │                          │  │ │
 │  │  └─────────────┘  └──────────────┘  └──────────────────────────┘  │ │
 │  │                                                                    │ │
-│  │  Functions: initialize, mint, burn, swap, collect, flash          │ │
+│  │  Functions: initialize, mint, burn, swap, collect, observe         │ │
 │  └───────────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │

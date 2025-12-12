@@ -131,10 +131,10 @@ main();
 // scripts/deploy/03_router.ts
 async function main() {
     const FACTORY = '0x...';  // From step 2
-    const WETH9 = '0x...';    // VinuChain WETH
+    const WVC = '0x...';      // VinuChain WVC (Wrapped VC)
 
     const SwapRouter = await ethers.getContractFactory('SwapRouter');
-    const router = await SwapRouter.deploy(FACTORY, WETH9);
+    const router = await SwapRouter.deploy(FACTORY, WVC);
     await router.deployed();
 
     console.log('SwapRouter:', router.address);
@@ -147,7 +147,7 @@ async function main() {
 // scripts/deploy/04_position_manager.ts
 async function main() {
     const FACTORY = '0x...';
-    const WETH9 = '0x...';
+    const WVC = '0x...';      // VinuChain WVC (Wrapped VC)
 
     // Deploy NFTDescriptor library first
     const NFTDescriptor = await ethers.getContractFactory('NFTDescriptor');
@@ -166,11 +166,11 @@ async function main() {
         }
     );
 
-    // Native currency label (e.g., "VINU" encoded as bytes32)
-    const nativeCurrencyLabel = ethers.utils.formatBytes32String('VINU');
+    // Native currency label (e.g., "VC" encoded as bytes32)
+    const nativeCurrencyLabel = ethers.utils.formatBytes32String('VC');
 
     const descriptor = await NonfungibleTokenPositionDescriptor.deploy(
-        WETH9,
+        WVC,
         nativeCurrencyLabel
     );
     await descriptor.deployed();
@@ -183,7 +183,7 @@ async function main() {
     );
     const positionManager = await NonfungiblePositionManager.deploy(
         FACTORY,
-        WETH9,
+        WVC,
         descriptor.address
     );
     await positionManager.deployed();
@@ -198,10 +198,10 @@ async function main() {
 // scripts/deploy/05_quoter.ts
 async function main() {
     const FACTORY = '0x...';
-    const WETH9 = '0x...';
+    const WVC = '0x...';      // VinuChain WVC (Wrapped VC)
 
     const VinuSwapQuoter = await ethers.getContractFactory('VinuSwapQuoter');
-    const quoter = await VinuSwapQuoter.deploy(FACTORY, WETH9);
+    const quoter = await VinuSwapQuoter.deploy(FACTORY, WVC);
     await quoter.deployed();
 
     console.log('VinuSwapQuoter:', quoter.address);
@@ -242,11 +242,11 @@ async function main() {
 
     // Configuration
     const config = {
-        WETH9: '0x...', // Existing WETH on VinuChain
+        WVC: '0x...', // Existing WVC (Wrapped VC) on VinuChain
         DISCOUNT_TOKEN: '0x...',
         FEE_ACCOUNTS: ['0x...', '0x...'],
         FEE_SHARES: [1, 1],
-        NATIVE_LABEL: 'VINU'
+        NATIVE_LABEL: 'VC'
     };
 
     const deployed: Record<string, string> = {};
@@ -299,7 +299,7 @@ async function main() {
     console.log('\n--- Deploying SwapRouter ---');
 
     const SwapRouter = await ethers.getContractFactory('SwapRouter');
-    const router = await SwapRouter.deploy(factory.address, config.WETH9);
+    const router = await SwapRouter.deploy(factory.address, config.WVC);
     await router.deployed();
     deployed.SwapRouter = router.address;
     console.log('SwapRouter:', router.address);
@@ -317,7 +317,7 @@ async function main() {
         { libraries: { NFTDescriptor: nftDescriptor.address } }
     );
     const descriptor = await Descriptor.deploy(
-        config.WETH9,
+        config.WVC,
         ethers.utils.formatBytes32String(config.NATIVE_LABEL)
     );
     await descriptor.deployed();
@@ -329,7 +329,7 @@ async function main() {
     );
     const positionManager = await PositionManager.deploy(
         factory.address,
-        config.WETH9,
+        config.WVC,
         descriptor.address
     );
     await positionManager.deployed();
@@ -340,7 +340,7 @@ async function main() {
     console.log('\n--- Deploying Quoter ---');
 
     const Quoter = await ethers.getContractFactory('VinuSwapQuoter');
-    const quoter = await Quoter.deploy(factory.address, config.WETH9);
+    const quoter = await Quoter.deploy(factory.address, config.WVC);
     await quoter.deployed();
     deployed.VinuSwapQuoter = quoter.address;
     console.log('VinuSwapQuoter:', quoter.address);
@@ -392,7 +392,7 @@ npx hardhat verify --network vinu 0x... \
 npx hardhat verify --network vinu 0x...
 
 # Verify SwapRouter
-npx hardhat verify --network vinu 0x... "0xFACTORY" "0xWETH9"
+npx hardhat verify --network vinu 0x... "0xFACTORY" "0xWVC"
 ```
 
 ## Post-Deployment

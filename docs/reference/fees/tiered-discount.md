@@ -13,10 +13,18 @@ TieredDiscount implements IFeeManager to provide progressive fee discounts:
 
 ## State Variables
 
-### discountToken
+### DENOMINATOR
 
 ```solidity
-IERC20 public discountToken;
+uint256 public constant DENOMINATOR = 10000;
+```
+
+Constant used for basis point calculations (10000 = 100%).
+
+### token
+
+```solidity
+address public token;
 ```
 
 The ERC20 token whose balance determines discount eligibility.
@@ -41,7 +49,7 @@ Discount amounts in basis points for each tier.
 
 ```solidity
 constructor(
-    address _discountToken,
+    address _token,
     uint256[] memory _thresholds,
     uint16[] memory _discounts
 )
@@ -49,7 +57,7 @@ constructor(
 
 | Parameter | Description |
 |-----------|-------------|
-| `_discountToken` | Token to check balance of |
+| `_token` | Token to check balance of |
 | `_thresholds` | Balance thresholds (must be ascending) |
 | `_discounts` | Discount bps for each threshold |
 
@@ -94,15 +102,8 @@ Computes the discounted fee based on the caller's token balance.
 
 ```solidity
 function computeFee(uint24 fee) external view override returns (uint24) {
-    uint256 balance = discountToken.balanceOf(tx.origin);
-    uint16 discount = _getDiscount(balance);
-
-    if (discount == 0) {
-        return fee;
-    }
-
-    // Apply discount: fee * (10000 - discount) / 10000
-    return uint24(uint256(fee) * (10000 - discount) / 10000);
+    // Note the usage of tx.origin instead of msg.sender
+    return computeFeeFor(fee, tx.origin);
 }
 ```
 
@@ -120,13 +121,40 @@ Discounted fee = 3000 * (10000 - 200) / 10000
 
 ---
 
-### setThresholds
+### computeFeeFor
 
 ```solidity
-function setThresholds(uint256[] memory _thresholds) external onlyOwner
+function computeFeeFor(uint24 fee, address recipient) public view returns (uint24)
 ```
 
-Updates the balance thresholds.
+Computes the fee for an arbitrary address. Useful for simulating fees before swapping.
+
+**Parameters:**
+
+| Name | Type | Description |
+|------|------|-------------|
+| `fee` | `uint24` | Base fee in hundredths of a bip |
+| `recipient` | `address` | Address to check balance for |
+
+**Returns:**
+
+| Type | Description |
+|------|-------------|
+| `uint24` | Discounted fee |
+
+---
+
+### updateInfo
+
+```solidity
+function updateInfo(
+    address _token,
+    uint256[] memory _thresholds,
+    uint16[] memory _discounts
+) public onlyOwner
+```
+
+Updates the token, thresholds, and discounts configuration.
 
 **Access Control:** Owner only
 
@@ -134,45 +162,31 @@ Updates the balance thresholds.
 
 | Name | Type | Description |
 |------|------|-------------|
-| `_thresholds` | `uint256[]` | New thresholds (ascending order) |
+| `_token` | `address` | Token to check balance of |
+| `_thresholds` | `uint256[]` | New thresholds (ascending order, positive values) |
+| `_discounts` | `uint16[]` | New discounts in bps (ascending order, <= 10000) |
 
 **Requirements:**
-- Length must match discounts array
-- Values must be in ascending order
+- Arrays must not be empty
+- Arrays must have the same length
+- Thresholds must be positive and strictly increasing
+- Discounts must be strictly increasing and <= 10000 (100%)
 
----
+**Example:**
 
-### setDiscounts
-
-```solidity
-function setDiscounts(uint16[] memory _discounts) external onlyOwner
+```javascript
+// Update to new configuration
+await tieredDiscount.updateInfo(
+    NEW_TOKEN_ADDRESS,
+    [
+        ethers.utils.parseEther('500'),    // Lower entry point
+        ethers.utils.parseEther('5000'),
+        ethers.utils.parseEther('50000'),
+        ethers.utils.parseEther('500000')
+    ],
+    [150, 300, 450, 600]  // 1.5%, 3%, 4.5%, 6%
+);
 ```
-
-Updates the discount rates.
-
-**Access Control:** Owner only
-
-**Parameters:**
-
-| Name | Type | Description |
-|------|------|-------------|
-| `_discounts` | `uint16[]` | New discounts in bps |
-
-**Requirements:**
-- Length must match thresholds array
-- Each discount must be < 10000 (< 100%)
-
----
-
-### setDiscountToken
-
-```solidity
-function setDiscountToken(address _discountToken) external onlyOwner
-```
-
-Updates the token used for balance checks.
-
-**Access Control:** Owner only
 
 ## Discount Tiers
 
@@ -188,16 +202,18 @@ Updates the token used for balance checks.
 ### Tier Selection Logic
 
 ```solidity
-function _getDiscount(uint256 balance) internal view returns (uint16) {
-    // Find highest applicable tier
-    for (uint i = thresholds.length; i > 0; i--) {
-        if (balance >= thresholds[i - 1]) {
-            return discounts[i - 1];
-        }
+uint16 bestDiscount = 0;
+
+for (uint256 i = 0; i < thresholds.length; i++) {
+    if (balance >= thresholds[i]) {
+        bestDiscount = discounts[i];
+    } else {
+        break;
     }
-    return 0; // No discount
 }
 ```
+
+The function iterates through thresholds in ascending order and selects the highest applicable discount.
 
 ## Usage Examples
 
@@ -220,9 +236,10 @@ const discounts = await Promise.all([
 ]);
 
 let userDiscount = 0;
-for (let i = thresholds.length - 1; i >= 0; i--) {
+for (let i = 0; i < thresholds.length; i++) {
     if (balance.gte(thresholds[i])) {
         userDiscount = discounts[i];
+    } else {
         break;
     }
 }
@@ -233,31 +250,20 @@ console.log(`User discount: ${userDiscount / 100}%`);
 ### Simulating Discounted Fee
 
 ```javascript
+// Simulate fee for a specific user
+const baseFee = 3000; // 0.3%
+const discountedFee = await tieredDiscount.computeFeeFor(baseFee, userAddress);
+console.log(`Effective fee: ${discountedFee / 10000}%`);
+```
+
+### Manual Calculation
+
+```javascript
 const baseFee = 3000; // 0.3%
 const userDiscount = 200; // 2%
 
 const discountedFee = baseFee * (10000 - userDiscount) / 10000;
 console.log(`Effective fee: ${discountedFee / 10000}%`); // 0.294%
-```
-
-### Updating Tiers
-
-```javascript
-// Set new thresholds
-await tieredDiscount.setThresholds([
-    ethers.utils.parseEther('500'),    // Lower entry point
-    ethers.utils.parseEther('5000'),
-    ethers.utils.parseEther('50000'),
-    ethers.utils.parseEther('500000')
-]);
-
-// Set corresponding discounts
-await tieredDiscount.setDiscounts([
-    150,  // 1.5%
-    300,  // 3%
-    450,  // 4.5%
-    600   // 6%
-]);
 ```
 
 ## Integration
@@ -301,7 +307,7 @@ await overridable.setOverride(stablePool, noDiscount.address);
 The contract uses `tx.origin` to determine the swapper's balance:
 
 ```solidity
-uint256 balance = discountToken.balanceOf(tx.origin);
+return computeFeeFor(fee, tx.origin);
 ```
 
 **Implications:**
@@ -321,21 +327,12 @@ uint256 balance = discountToken.balanceOf(tx.origin);
 ### Owner Privileges
 
 The owner can:
-- Change thresholds and discounts at any time
-- Set discount token to a different address
+- Change token, thresholds, and discounts at any time via `updateInfo()`
 
 **Recommendations:**
 - Use multisig for ownership
 - Add timelock for configuration changes
 - Consider immutable deployments
-
-## Events
-
-```solidity
-event ThresholdsUpdated(uint256[] thresholds);
-event DiscountsUpdated(uint16[] discounts);
-event DiscountTokenUpdated(address token);
-```
 
 ## Related
 

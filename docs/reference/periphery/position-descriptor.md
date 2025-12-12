@@ -37,7 +37,7 @@ A base64-encoded data URI containing JSON metadata:
 
 ```json
 {
-  "name": "VinuSwap - 0.3% - USDC/WETH - 1800<>2200",
+  "name": "VinuSwap - 0.3% - USDT/WVC - 1800<>2200",
   "description": "This NFT represents a liquidity position...",
   "image": "data:image/svg+xml;base64,..."
 }
@@ -68,7 +68,7 @@ The SVG visualization includes:
 
   <!-- Token symbols -->
   <text x="145" y="50" text-anchor="middle" fill="#fff" font-size="24">
-    USDC/WETH
+    USDT/WVC
   </text>
 
   <!-- Fee tier -->
@@ -82,10 +82,10 @@ The SVG visualization includes:
 
   <!-- Range values -->
   <text x="30" y="160" fill="#fff" font-size="12">
-    Min: 1,800 USDC/WETH
+    Min: 1,800 USDT/WVC
   </text>
   <text x="30" y="180" fill="#fff" font-size="12">
-    Max: 2,200 USDC/WETH
+    Max: 2,200 USDT/WVC
   </text>
 
   <!-- Token ID -->
@@ -142,12 +142,12 @@ The descriptor attempts to resolve token symbols:
 
 1. Calls `symbol()` on the token contract
 2. Falls back to address truncation if call fails
-3. Uses WETH9 native symbol for wrapped ETH
+3. Uses WVC native symbol for wrapped VC
 
 ```solidity
 function tokenSymbol(address token) private view returns (string memory) {
-    if (token == WETH9) {
-        return nativeCurrencyLabelBytes;  // e.g., "ETH"
+    if (token == WVC) {
+        return nativeCurrencyLabelBytes;  // e.g., "VC"
     }
 
     // Try to call symbol()
@@ -168,15 +168,15 @@ function tokenSymbol(address token) private view returns (string memory) {
 
 ```solidity
 constructor(
-    address _WETH9,
+    address _WVC,
     bytes32 _nativeCurrencyLabelBytes
 )
 ```
 
 | Parameter | Description |
 |-----------|-------------|
-| `_WETH9` | Wrapped native currency address |
-| `_nativeCurrencyLabelBytes` | Native currency symbol (e.g., "ETH", "BNB") |
+| `_WVC` | Wrapped native currency address |
+| `_nativeCurrencyLabelBytes` | Native currency symbol (e.g., "VC") |
 
 ## Integration
 

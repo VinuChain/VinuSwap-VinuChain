@@ -78,9 +78,9 @@ const limit = currentSqrtPrice.mul(1005).div(1000); // ~0.5% above current
 The path encodes token addresses and fees:
 
 ```javascript
-// WETH → USDC → DAI
+// WVC → USDT → TOKEN_C
 const path = encodePath(
-    [WETH, USDC, DAI],
+    [WVC, USDT, TOKEN_C],
     [3000, 500]  // 0.3% then 0.05%
 );
 

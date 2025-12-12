@@ -127,7 +127,7 @@ await token.approve(router, exactAmount);
 
 ### 3. Oracle Manipulation
 
-**Risk:** Flash loans can manipulate spot prices.
+**Risk:** Large trades can manipulate spot prices within a single block.
 
 **Mitigation:**
 - Never use spot price for critical decisions
@@ -148,7 +148,7 @@ await token.approve(router, exactAmount);
 When implementing callbacks, always verify the caller:
 
 ```solidity
-function vinuSwapSwapCallback(
+function uniswapV3SwapCallback(
     int256 amount0Delta,
     int256 amount1Delta,
     bytes calldata data
@@ -161,28 +161,7 @@ function vinuSwapSwapCallback(
 }
 ```
 
-## Flash Loan Security
-
-Flash callbacks must repay the loan plus fee:
-
-```solidity
-function vinuSwapFlashCallback(
-    uint256 fee0,
-    uint256 fee1,
-    bytes calldata data
-) external override {
-    // Verify callback
-    CallbackValidation.verifyCallback(factory, poolKey);
-
-    // MUST repay: amount + fee
-    if (amount0 > 0) {
-        token0.transfer(msg.sender, amount0 + fee0);
-    }
-    if (amount1 > 0) {
-        token1.transfer(msg.sender, amount1 + fee1);
-    }
-}
-```
+**Note:** VinuSwap uses Uniswap V3 callback interface names for compatibility.
 
 ## Position Security
 

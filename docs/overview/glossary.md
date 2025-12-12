@@ -44,9 +44,6 @@ The portion of swap fees directed to the protocol (controlled by factory owner).
 ### Fee Tier
 The swap fee percentage for a pool (e.g., 0.05%, 0.25%, 1%).
 
-### Flash Swap
-A swap where tokens are received before payment, allowing arbitrage within a single transaction.
-
 ## I
 
 ### Impermanent Loss
@@ -153,8 +150,8 @@ An average price calculated over a time period, resistant to manipulation.
 
 ## W
 
-### WETH9
-Wrapped ETH contract that wraps native ETH as an ERC20 token.
+### WVC
+Wrapped VC contract that wraps native VC (VinuCoin) as an ERC20 token.
 
 ## X
 

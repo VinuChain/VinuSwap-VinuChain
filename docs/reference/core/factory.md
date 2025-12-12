@@ -80,8 +80,8 @@ Deploys a new pool for the given token pair.
 ```solidity
 // Create a pool with 0.3% fee and tick spacing of 60
 address pool = factory.createPool(
-    WETH,           // tokenA
-    USDC,           // tokenB
+    WVC,            // tokenA
+    USDT,           // tokenB
     3000,           // 0.3% fee
     60,             // tick spacing
     tieredDiscount  // fee manager
@@ -117,6 +117,7 @@ event PoolCreated(
     address indexed token1,
     uint24 indexed fee,
     int24 tickSpacing,
+    address feeManager,
     address pool
 );
 ```
@@ -174,6 +175,7 @@ interface IVinuSwapFactory {
         address indexed token1,
         uint24 indexed fee,
         int24 tickSpacing,
+        address feeManager,
         address pool
     );
 
@@ -204,10 +206,10 @@ interface IVinuSwapFactory {
 ```javascript
 const factory = new ethers.Contract(factoryAddress, factoryABI, signer);
 
-// Create WETH/USDC pool with 0.05% fee
+// Create WVC/USDT pool with 0.05% fee
 const tx = await factory.createPool(
-    WETH_ADDRESS,
-    USDC_ADDRESS,
+    WVC_ADDRESS,
+    USDT_ADDRESS,
     500,           // 0.05%
     10,            // tick spacing
     feeManager     // fee manager contract
@@ -223,8 +225,8 @@ const poolAddress = poolCreatedEvent.args.pool;
 ```javascript
 // Get pool address (order doesn't matter)
 const poolAddress = await factory.getPool(
-    USDC_ADDRESS,  // Can be in any order
-    WETH_ADDRESS,
+    USDT_ADDRESS,  // Can be in any order
+    WVC_ADDRESS,
     500
 );
 

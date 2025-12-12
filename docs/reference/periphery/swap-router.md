@@ -9,7 +9,7 @@ The SwapRouter contract provides functions to execute swaps through VinuSwap poo
 The SwapRouter is a stateless contract that:
 - Routes swaps through single or multiple pools
 - Handles exact input and exact output swaps
-- Manages ETH ↔ WETH conversions
+- Manages VC ↔ WVC conversions
 - Provides deadline and slippage protection
 
 ## Inheritance
@@ -75,13 +75,13 @@ struct ExactInputSingleParams {
 
 ```javascript
 const params = {
-    tokenIn: WETH,
-    tokenOut: USDC,
+    tokenIn: WVC,
+    tokenOut: USDT,
     fee: 3000,           // 0.3%
     recipient: userAddress,
     deadline: Math.floor(Date.now() / 1000) + 1800,
     amountIn: ethers.utils.parseEther('1'),
-    amountOutMinimum: ethers.utils.parseUnits('1900', 6), // Min 1900 USDC
+    amountOutMinimum: ethers.utils.parseUnits('0.4', 6), // Min 0.4 USDT
     sqrtPriceLimitX96: 0
 };
 
@@ -126,10 +126,10 @@ struct ExactInputParams {
 **Path Encoding:**
 
 ```javascript
-// WETH → USDC → DAI
+// WVC → USDT → TOKEN_C
 const path = ethers.utils.solidityPack(
     ['address', 'uint24', 'address', 'uint24', 'address'],
-    [WETH, 3000, USDC, 500, DAI]
+    [WVC, 3000, USDT, 500, TOKEN_C]
 );
 ```
 
@@ -137,11 +137,11 @@ const path = ethers.utils.solidityPack(
 
 ```javascript
 const params = {
-    path: encodePath([WETH, USDC, DAI], [3000, 500]),
+    path: encodePath([WVC, USDT, TOKEN_C], [3000, 500]),
     recipient: userAddress,
     deadline: Math.floor(Date.now() / 1000) + 1800,
     amountIn: ethers.utils.parseEther('1'),
-    amountOutMinimum: ethers.utils.parseUnits('1850', 18)
+    amountOutMinimum: ethers.utils.parseUnits('100', 18)
 };
 
 const amountOut = await router.exactInput(params);
@@ -198,13 +198,13 @@ struct ExactOutputSingleParams {
 
 ```javascript
 const params = {
-    tokenIn: WETH,
-    tokenOut: USDC,
+    tokenIn: WVC,
+    tokenOut: USDT,
     fee: 3000,
     recipient: userAddress,
     deadline: Math.floor(Date.now() / 1000) + 1800,
-    amountOut: ethers.utils.parseUnits('2000', 6), // Exactly 2000 USDC
-    amountInMaximum: ethers.utils.parseEther('1.1'), // Max 1.1 WETH
+    amountOut: ethers.utils.parseUnits('100', 6), // Exactly 100 USDT
+    amountInMaximum: ethers.utils.parseEther('250'), // Max 250 WVC
     sqrtPriceLimitX96: 0
 };
 
@@ -243,11 +243,11 @@ struct ExactOutputParams {
 **Path Encoding for Exact Output:**
 
 ```javascript
-// WETH → USDC → DAI (want DAI)
-// Path is reversed: DAI → USDC → WETH
+// WVC → USDT → TOKEN_C (want TOKEN_C)
+// Path is reversed: TOKEN_C → USDT → WVC
 const path = ethers.utils.solidityPack(
     ['address', 'uint24', 'address', 'uint24', 'address'],
-    [DAI, 500, USDC, 3000, WETH]  // Reversed!
+    [TOKEN_C, 500, USDT, 3000, WVC]  // Reversed!
 );
 ```
 
@@ -277,13 +277,13 @@ Callback from pool during swap. Handles payment of input tokens.
 
 ## Payment Functions
 
-### unwrapWETH9
+### unwrapWVC
 
 ```solidity
-function unwrapWETH9(uint256 amountMinimum, address recipient) external payable
+function unwrapWVC(uint256 amountMinimum, address recipient) external payable
 ```
 
-Unwraps WETH9 to ETH.
+Unwraps WVC to VC.
 
 ### sweepToken
 
@@ -321,7 +321,7 @@ Executes multiple router calls in a single transaction.
 // Swap and unwrap in one transaction
 const calls = [
     router.interface.encodeFunctionData('exactInputSingle', [swapParams]),
-    router.interface.encodeFunctionData('unwrapWETH9', [minAmount, recipient])
+    router.interface.encodeFunctionData('unwrapWVC', [minAmount, recipient])
 ];
 
 await router.multicall(calls);
@@ -361,13 +361,13 @@ Calls permit only if current allowance is insufficient.
 
 ## Common Patterns
 
-### Swap ETH for Tokens
+### Swap VC for Tokens
 
 ```javascript
-// Send ETH with the transaction (will be wrapped automatically)
+// Send VC with the transaction (will be wrapped automatically)
 const params = {
-    tokenIn: WETH9,
-    tokenOut: USDC,
+    tokenIn: WVC,
+    tokenOut: USDT,
     fee: 3000,
     recipient: userAddress,
     deadline: deadline,
@@ -379,17 +379,17 @@ const params = {
 await router.exactInputSingle(params, { value: params.amountIn });
 ```
 
-### Swap Tokens for ETH
+### Swap Tokens for VC
 
 ```javascript
 // Use ADDRESS_ZERO as recipient to trigger unwrap
 const params = {
-    tokenIn: USDC,
-    tokenOut: WETH9,
+    tokenIn: USDT,
+    tokenOut: WVC,
     fee: 3000,
     recipient: ethers.constants.AddressZero,  // ADDRESS_ZERO
     deadline: deadline,
-    amountIn: ethers.utils.parseUnits('2000', 6),
+    amountIn: ethers.utils.parseUnits('100', 6),
     amountOutMinimum: 0,
     sqrtPriceLimitX96: 0
 };
@@ -397,8 +397,8 @@ const params = {
 // Use multicall to swap and unwrap
 const calls = [
     router.interface.encodeFunctionData('exactInputSingle', [params]),
-    router.interface.encodeFunctionData('unwrapWETH9', [
-        ethers.utils.parseEther('0.9'),  // Minimum ETH
+    router.interface.encodeFunctionData('unwrapWVC', [
+        ethers.utils.parseEther('100'),  // Minimum VC
         userAddress                       // Actual recipient
     ])
 ];

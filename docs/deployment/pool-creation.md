@@ -38,8 +38,8 @@ async function createPool(
 
 | Pair Type | Fee (bps) | Tick Spacing | Use Case |
 |-----------|-----------|--------------|----------|
-| Stable-Stable | 100 | 1 | USDC/USDT, DAI/USDC |
-| Stable-Major | 500 | 10 | USDC/WETH |
+| Stable-Stable | 100 | 1 | Stablecoin pairs |
+| Stable-Major | 500 | 10 | USDT/WVC |
 | Standard | 3000 | 60 | Most pairs |
 | Volatile | 10000 | 200 | Long-tail assets |
 
@@ -54,47 +54,30 @@ async function main() {
     const CONTROLLER = '0x...';
     const FEE_MANAGER = '0x...';
 
-    // Tokens
-    const WETH = '0x...';
-    const USDC = '0x...';
-    const DAI = '0x...';
-    const USDT = '0x...';
+    // Tokens on VinuChain
+    const WVC = '0xEd8c5530a0A086a12f57275728128a60DFf04230';   // Wrapped VC
+    const USDT = '0xC0264277fcCa5FCfabd41a8bC01c1FcAF8383E41';  // USDT
+    const TOKEN_A = '0x...';  // Other token
 
     const controller = await ethers.getContractAt('Controller', CONTROLLER);
 
     // Pool configurations
     const pools = [
         {
-            name: 'WETH/USDC',
-            tokenA: WETH,
-            tokenB: USDC,
+            name: 'WVC/USDT',
+            tokenA: WVC,
+            tokenB: USDT,
             fee: 3000,      // 0.3%
             tickSpacing: 60,
-            initialPrice: 2000  // 1 WETH = 2000 USDC
+            initialPrice: 0.5  // 1 WVC = 0.5 USDT
         },
         {
-            name: 'WETH/DAI',
-            tokenA: WETH,
-            tokenB: DAI,
+            name: 'WVC/TOKEN_A',
+            tokenA: WVC,
+            tokenB: TOKEN_A,
             fee: 3000,
             tickSpacing: 60,
-            initialPrice: 2000
-        },
-        {
-            name: 'USDC/DAI',
-            tokenA: USDC,
-            tokenB: DAI,
-            fee: 500,       // 0.05%
-            tickSpacing: 10,
-            initialPrice: 1  // 1:1
-        },
-        {
-            name: 'USDC/USDT',
-            tokenA: USDC,
-            tokenB: USDT,
-            fee: 100,       // 0.01%
-            tickSpacing: 1,
-            initialPrice: 1
+            initialPrice: 100
         }
     ];
 
@@ -157,10 +140,10 @@ function encodePriceForPool(
     );
 }
 
-// Example: USDC (6 decimals) / WETH (18 decimals)
-// Price: 1 WETH = 2000 USDC
-// token0 = USDC, token1 = WETH (sorted by address)
-const sqrtPriceX96 = encodePriceForPool(2000, 6, 18);
+// Example: USDT (6 decimals) / WVC (18 decimals)
+// Price: 1 WVC = 0.5 USDT
+// token0 = USDT, token1 = WVC (sorted by address)
+const sqrtPriceX96 = encodePriceForPool(0.5, 6, 18);
 ```
 
 ### Simple Price Encoding
@@ -175,8 +158,8 @@ function encodePrice(price: number): BigNumber {
 // For 1:1 price
 const oneToOne = encodePrice(1);
 
-// For 2000:1 (WETH/USDC)
-const wethUsdc = encodePrice(2000);
+// For 0.5:1 (WVC/USDT)
+const wvcUsdt = encodePrice(0.5);
 ```
 
 ### Initialize via Controller

@@ -45,22 +45,22 @@ Periphery contracts inherit from several base contracts:
 
 ### PeripheryImmutableState
 
-Stores immutable references to factory and WETH9:
+Stores immutable references to factory and WVC:
 
 ```solidity
 address public immutable factory;
-address public immutable WETH9;
+address public immutable WVC;
 ```
 
 ### PeripheryPayments
 
-Handles token transfers and ETH wrapping:
+Handles token transfers and VC wrapping:
 
 ```solidity
 function pay(address token, address payer, address recipient, uint256 value)
-function unwrapWETH9(uint256 amountMinimum, address recipient)
+function unwrapWVC(uint256 amountMinimum, address recipient)
 function sweepToken(address token, uint256 amountMinimum, address recipient)
-function refundETH()
+function refundVC()
 ```
 
 ### PeripheryPaymentsWithFee
@@ -68,7 +68,7 @@ function refundETH()
 Extends PeripheryPayments with fee extraction:
 
 ```solidity
-function unwrapWETH9WithFee(uint256 amountMinimum, address recipient, uint256 feeBips, address feeRecipient)
+function unwrapWVCWithFee(uint256 amountMinimum, address recipient, uint256 feeBips, address feeRecipient)
 function sweepTokenWithFee(address token, uint256 amountMinimum, address recipient, uint256 feeBips, address feeRecipient)
 ```
 
@@ -124,7 +124,7 @@ The SwapRouter executes swaps through VinuSwap pools.
 - Single and multi-hop swaps
 - Exact input and exact output modes
 - Deadline and slippage protection
-- ETH ↔ WETH handling
+- VC ↔ WVC handling
 - Permit support for gasless approvals
 
 [Full Reference →](swap-router.md)
@@ -207,24 +207,24 @@ const calls = [
 await router.multicall(calls);
 ```
 
-### ETH Handling
+### VC Handling
 
-The periphery contracts handle ETH automatically:
+The periphery contracts handle VC automatically:
 
 ```javascript
-// Send ETH with the transaction
+// Send VC with the transaction
 await router.exactInputSingle(
-    { ...params, tokenIn: WETH9 },
+    { ...params, tokenIn: WVC },
     { value: amountIn }
 );
 
-// Receive ETH from swap
+// Receive VC from swap
 await router.exactInputSingle({
     ...params,
-    tokenOut: WETH9,
+    tokenOut: WVC,
     recipient: ADDRESS_ZERO // Indicates unwrap
 });
-await router.unwrapWETH9(amountOutMinimum, recipientAddress);
+await router.unwrapWVC(amountOutMinimum, recipientAddress);
 ```
 
 ## VinuSwap Extensions

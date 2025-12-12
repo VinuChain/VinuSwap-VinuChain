@@ -124,8 +124,8 @@ TransferHelper.safeTransferFrom(token, from, to, amount);
 // Safe approve
 TransferHelper.safeApprove(token, spender, amount);
 
-// Safe transfer ETH
-TransferHelper.safeTransferETH(recipient, amount);
+// Safe transfer VC (native currency)
+TransferHelper.safeTransferVC(recipient, amount);
 ```
 
 ## Related

@@ -42,7 +42,7 @@ function nearestUsableTick(tick, tickSpacing) {
     return Math.round(tick / tickSpacing) * tickSpacing;
 }
 
-// Example: WETH/USDC position from $1,800 to $2,200
+// Example: WVC/USDT position from $1,800 to $2,200
 const tickSpacing = 60;  // 0.3% fee tier
 const tickLower = nearestUsableTick(priceToTick(1800), tickSpacing);
 const tickUpper = nearestUsableTick(priceToTick(2200), tickSpacing);
@@ -105,38 +105,38 @@ async function createPosition(
 
 // Usage
 const { tokenId } = await createPosition(
-    USDC,
-    WETH,
+    USDT,
+    WVC,
     3000,  // 0.3% fee
     tickLower,
     tickUpper,
-    ethers.utils.parseUnits('2000', 6),  // 2000 USDC
-    ethers.utils.parseEther('1')          // 1 WETH
+    ethers.utils.parseUnits('2000', 6),  // 2000 USDT
+    ethers.utils.parseEther('1')          // 1 WVC
 );
 ```
 
-### Create Position with ETH
+### Create Position with VC
 
 ```javascript
-async function createPositionWithETH(
+async function createPositionWithVC(
     token,
     fee,
     tickLower,
     tickUpper,
     tokenAmount,
-    ethAmount
+    vcAmount
 ) {
-    // WETH is always either token0 or token1
-    const isWETHToken0 = WETH.toLowerCase() < token.toLowerCase();
+    // WVC is always either token0 or token1
+    const isWVCToken0 = WVC.toLowerCase() < token.toLowerCase();
 
     const params = {
-        token0: isWETHToken0 ? WETH : token,
-        token1: isWETHToken0 ? token : WETH,
+        token0: isWVCToken0 ? WVC : token,
+        token1: isWVCToken0 ? token : WVC,
         fee,
         tickLower,
         tickUpper,
-        amount0Desired: isWETHToken0 ? ethAmount : tokenAmount,
-        amount1Desired: isWETHToken0 ? tokenAmount : ethAmount,
+        amount0Desired: isWVCToken0 ? vcAmount : tokenAmount,
+        amount1Desired: isWVCToken0 ? tokenAmount : vcAmount,
         amount0Min: 0,
         amount1Min: 0,
         recipient: signer.address,
@@ -147,8 +147,8 @@ async function createPositionWithETH(
     const tokenContract = new ethers.Contract(token, erc20ABI, signer);
     await tokenContract.approve(positionManager.address, tokenAmount);
 
-    // Mint with ETH value
-    const tx = await positionManager.mint(params, { value: ethAmount });
+    // Mint with VC value
+    const tx = await positionManager.mint(params, { value: vcAmount });
     return await tx.wait();
 }
 ```
@@ -252,17 +252,17 @@ async function collectFees(tokenId, recipient) {
 }
 ```
 
-### Collect to ETH
+### Collect to VC
 
-If your position includes WETH and you want ETH:
+If your position includes WVC and you want VC:
 
 ```javascript
-async function collectToETH(tokenId) {
+async function collectToVC(tokenId) {
     const position = await positionManager.positions(tokenId);
-    const hasWETH = position.token0 === WETH || position.token1 === WETH;
+    const hasWVC = position.token0 === WVC || position.token1 === WVC;
 
-    if (!hasWETH) {
-        throw new Error('Position does not include WETH');
+    if (!hasWVC) {
+        throw new Error('Position does not include WVC');
     }
 
     // Collect to router (ADDRESS_ZERO triggers unwrap handling)
@@ -275,9 +275,9 @@ async function collectToETH(tokenId) {
 
     const calls = [
         positionManager.interface.encodeFunctionData('collect', [collectParams]),
-        positionManager.interface.encodeFunctionData('unwrapWETH9', [0, signer.address]),
+        positionManager.interface.encodeFunctionData('unwrapWVC', [0, signer.address]),
         positionManager.interface.encodeFunctionData('sweepToken', [
-            position.token0 === WETH ? position.token1 : position.token0,
+            position.token0 === WVC ? position.token1 : position.token0,
             0,
             signer.address
         ])

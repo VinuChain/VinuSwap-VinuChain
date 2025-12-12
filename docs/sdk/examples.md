@@ -7,7 +7,8 @@ Complete examples for common VinuSwap operations.
 ```typescript
 import { ethers } from 'ethers';
 import { VinuSwap } from './sdk/core';
-import { encodePrice, priceToTick, nearestUsableTick } from './sdk/utils';
+import { encodePrice, decodePrice } from './sdk/utils';
+import { nearestUsableTick } from '@uniswap/v3-sdk';
 
 // Configuration
 const config = {
@@ -21,14 +22,19 @@ const config = {
     pool: '0x...'       // Pool address (depends on token pair)
 };
 
+// Helper: convert price to tick
+function priceToTick(price: number): number {
+    return Math.floor(Math.log(price) / Math.log(1.0001));
+}
+
 // Setup
 const provider = new ethers.providers.JsonRpcProvider(config.rpcUrl);
 const signer = new ethers.Wallet(process.env.PRIVATE_KEY!, provider);
 
 async function getSDK() {
     const sdk = await VinuSwap.create(
-        config.weth,
-        config.usdc,
+        config.wvc,
+        config.usdt,
         config.pool,
         config.quoter,
         config.router,
@@ -47,27 +53,27 @@ async function getSDK() {
 async function simpleSwap() {
     const sdk = await getSDK();
 
-    // Swap 0.1 ETH for USDC
+    // Swap 0.1 WVC for USDT
     const amountIn = ethers.utils.parseEther('0.1');
 
     // Get quote first
-    const quote = await sdk.getQuote(config.weth, config.usdc, amountIn);
-    console.log('Expected:', ethers.utils.formatUnits(quote.amountOut, 6), 'USDC');
+    const quote = await sdk.getQuote(config.wvc, config.usdt, amountIn);
+    console.log('Expected:', ethers.utils.formatUnits(quote.amountOut, 6), 'USDT');
 
     // Calculate minimum with 0.5% slippage
     const minOut = quote.amountOut.mul(9950).div(10000);
 
     // Execute swap
     const result = await sdk.swap(
-        config.weth,
-        config.usdc,
+        config.wvc,
+        config.usdt,
         amountIn,
         minOut,
         Math.floor(Date.now() / 1000) + 1800
     );
 
     console.log('Swap executed:', result.hash);
-    console.log('Received:', ethers.utils.formatUnits(result.amountOut, 6), 'USDC');
+    console.log('Received:', ethers.utils.formatUnits(result.amountOut, 6), 'USDT');
 }
 ```
 
@@ -80,12 +86,12 @@ async function swapWithPriceLimit() {
     const amountIn = ethers.utils.parseEther('1');
 
     // Set price limit (won't swap beyond this price)
-    const maxPrice = 2100; // Max 2100 USDC per ETH
+    const maxPrice = '0.5'; // Max 0.5 USDT per WVC
     const sqrtPriceLimitX96 = encodePrice(maxPrice);
 
     const result = await sdk.router.exactInputSingle({
-        tokenIn: config.weth,
-        tokenOut: config.usdc,
+        tokenIn: config.wvc,
+        tokenOut: config.usdt,
         fee: 3000,
         recipient: await signer.getAddress(),
         deadline: Math.floor(Date.now() / 1000) + 1800,
@@ -103,11 +109,11 @@ async function swapWithPriceLimit() {
 ```typescript
 async function multiHopSwap() {
     const sdk = await getSDK();
-    const DAI = '0x...';
+    const TOKEN_C = '0x...';  // Third token in the path
 
-    // Swap WETH → USDC → DAI
+    // Swap WVC → USDT → TOKEN_C
     const path = encodePath(
-        [config.weth, config.usdc, DAI],
+        [config.wvc, config.usdt, TOKEN_C],
         [3000, 500]
     );
 
@@ -147,8 +153,8 @@ async function createPosition() {
     const tickUpper = nearestUsableTick(priceToTick(2100), tickSpacing);
 
     // Amounts to add
-    const amount0 = ethers.utils.parseUnits('1000', 6);  // 1000 USDC
-    const amount1 = ethers.utils.parseEther('0.5');       // 0.5 ETH
+    const amount0 = ethers.utils.parseUnits('1000', 6);  // 1000 USDT
+    const amount1 = ethers.utils.parseEther('0.5');       // 0.5 WVC
 
     // Approve tokens
     await sdk.token0Contract.approve(config.positionManager, amount0);
@@ -323,7 +329,7 @@ async function safeOperation() {
     } catch (error: any) {
         // Parse error
         if (error.code === 'INSUFFICIENT_FUNDS') {
-            console.error('Not enough ETH for gas');
+            console.error('Not enough VC for gas');
         } else if (error.message.includes('STF')) {
             console.error('Transfer failed - check token balance and allowance');
         } else if (error.message.includes('Too little received')) {
@@ -347,8 +353,8 @@ class VinuSwapDApp {
 
     async connect(signer: ethers.Signer) {
         const base = await VinuSwap.create(
-            config.weth,
-            config.usdc,
+            config.wvc,
+            config.usdt,
             config.pool,
             config.quoter,
             config.router,
@@ -377,7 +383,7 @@ class VinuSwapDApp {
 
     async getQuote(amountIn: ethers.BigNumber) {
         if (!this.sdk) throw new Error('Not connected');
-        return this.sdk.getQuote(config.weth, config.usdc, amountIn);
+        return this.sdk.getQuote(config.wvc, config.usdt, amountIn);
     }
 
     async swap(amountIn: ethers.BigNumber, slippage: number = 0.5) {
@@ -387,8 +393,8 @@ class VinuSwapDApp {
         const minOut = quote.amountOut.mul(10000 - slippage * 100).div(10000);
 
         return this.sdk.swap(
-            config.weth,
-            config.usdc,
+            config.wvc,
+            config.usdt,
             amountIn,
             minOut,
             Math.floor(Date.now() / 1000) + 1800

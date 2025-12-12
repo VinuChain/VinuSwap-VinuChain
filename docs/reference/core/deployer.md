@@ -26,22 +26,33 @@ This pattern avoids passing constructor arguments in the bytecode, enabling dete
 
 ## State Variables
 
+### Internal Parameter Storage
+
+```solidity
+address internal _factory;
+address internal _token0;
+address internal _token1;
+uint24 internal _fee;
+int24 internal _tickSpacing;
+address internal _feeManager;
+```
+
+Temporarily holds deployment parameters during pool creation. Set before `new VinuSwapPool()` and read via `parameters()` during pool constructor.
+
 ### parameters
 
 ```solidity
-struct Parameters {
-    address factory;
-    address token0;
-    address token1;
-    uint24 fee;
-    int24 tickSpacing;
-    address feeManager;
-}
-
-Parameters public override parameters;
+function parameters() public view override returns (
+    address factory,
+    address token0,
+    address token1,
+    uint24 fee,
+    int24 tickSpacing,
+    address feeManager
+)
 ```
 
-Temporarily holds deployment parameters during pool creation. Set before `new VinuSwapPool()` and cleared after.
+Returns the current deployment parameters. Called by the pool constructor to retrieve its configuration.
 
 ## Functions
 
@@ -167,7 +178,7 @@ interface IVinuSwapPoolDeployer {
 
 1. **Inheritance**: The deployer is inherited by the factory, not a standalone contract.
 
-2. **Transient Storage**: Parameters are cleared after deployment to prevent misuse.
+2. **Parameter Storage**: Parameters are stored in internal variables and overwritten on each deployment. Since `deploy()` is internal and only callable by the factory, the parameters cannot be manipulated externally.
 
 3. **Deterministic Addresses**: The CREATE2 pattern ensures pool addresses can be computed without querying the chain.
 

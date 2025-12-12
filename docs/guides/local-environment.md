@@ -56,7 +56,7 @@ npx hardhat node
 ```
 
 This starts a local Hardhat node with:
-- 2000 test accounts with 10,000 ETH each
+- 2000 test accounts with 10,000 VC each
 - Block time: instant
 - Chain ID: 31337
 

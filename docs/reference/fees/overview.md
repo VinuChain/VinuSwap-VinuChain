@@ -103,7 +103,7 @@ Protocol fee collection and distribution:
 ### 1. Swap Fee Application
 
 ```
-Swap Amount: 1000 USDC
+Swap Amount: 1000 USDT
 Pool Fee: 0.3% (3000 bps)
 User Balance: 500,000 discount tokens
 
@@ -111,29 +111,29 @@ User Balance: 500,000 discount tokens
 2. TieredDiscount checks user balance
    - 500,000 >= 100,000 → 3% discount
 3. Returns: 3000 * 0.97 = 2910 bps (0.291%)
-4. Effective fee: 2.91 USDC (instead of 3 USDC)
+4. Effective fee: 2.91 USDT (instead of 3 USDT)
 ```
 
 ### 2. Protocol Fee Split
 
 ```
-Swap Fee Collected: 2.91 USDC
+Swap Fee Collected: 2.91 USDT
 Protocol Fee Setting: 5 (= 1/5 = 20%)
 
-Protocol portion: 2.91 * 0.20 = 0.582 USDC
-LP portion: 2.91 * 0.80 = 2.328 USDC
+Protocol portion: 2.91 * 0.20 = 0.582 USDT
+LP portion: 2.91 * 0.80 = 2.328 USDT
 ```
 
 ### 3. Fee Distribution
 
 ```
-Protocol Fees in Controller: 100 USDC
+Protocol Fees in Controller: 100 USDT
 Shares: [Account1: 1, Account2: 2, Account3: 2]
 Total Shares: 5
 
-Account1: 100 * (1/5) = 20 USDC
-Account2: 100 * (2/5) = 40 USDC
-Account3: 100 * (2/5) = 40 USDC
+Account1: 100 * (1/5) = 20 USDT
+Account2: 100 * (2/5) = 40 USDT
+Account3: 100 * (2/5) = 40 USDT
 ```
 
 ## Configuration

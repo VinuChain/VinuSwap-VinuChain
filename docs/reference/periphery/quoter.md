@@ -26,30 +26,36 @@ This allows simulation without state changes or token transfers.
 ### quoteExactInputSingle
 
 ```solidity
-function quoteExactInputSingle(
-    address tokenIn,
-    address tokenOut,
-    uint24 fee,
-    uint256 amountIn,
-    uint160 sqrtPriceLimitX96
-) external override returns (
-    uint256 amountOut,
-    uint160 sqrtPriceX96After,
-    uint32 initializedTicksCrossed,
-    uint256 gasEstimate
-)
+function quoteExactInputSingle(QuoteExactInputSingleParams memory params)
+    external
+    returns (
+        uint256 amountOut,
+        uint160 sqrtPriceX96After,
+        uint32 initializedTicksCrossed,
+        uint256 gasEstimate
+    )
 ```
 
 Quotes the output amount for an exact input single swap.
 
-**Parameters:**
+**Parameters Struct:**
+
+```solidity
+struct QuoteExactInputSingleParams {
+    address tokenIn;
+    address tokenOut;
+    uint256 amountIn;
+    uint24 fee;
+    uint160 sqrtPriceLimitX96;
+}
+```
 
 | Name | Type | Description |
 |------|------|-------------|
 | `tokenIn` | `address` | Input token address |
 | `tokenOut` | `address` | Output token address |
-| `fee` | `uint24` | Pool fee tier |
 | `amountIn` | `uint256` | Exact input amount |
+| `fee` | `uint24` | Pool fee tier |
 | `sqrtPriceLimitX96` | `uint160` | Price limit (0 for none) |
 
 **Returns:**
@@ -64,15 +70,17 @@ Quotes the output amount for an exact input single swap.
 **Example:**
 
 ```javascript
-const [amountOut, priceAfter, ticksCrossed, gas] = await quoter.callStatic.quoteExactInputSingle(
-    WETH,
-    USDC,
-    3000,
-    ethers.utils.parseEther('1'),
-    0
-);
+const params = {
+    tokenIn: WVC,
+    tokenOut: USDT,
+    amountIn: ethers.utils.parseEther('1'),
+    fee: 3000,
+    sqrtPriceLimitX96: 0
+};
 
-console.log('Expected output:', ethers.utils.formatUnits(amountOut, 6), 'USDC');
+const [amountOut, priceAfter, ticksCrossed, gas] = await quoter.callStatic.quoteExactInputSingle(params);
+
+console.log('Expected output:', ethers.utils.formatUnits(amountOut, 6), 'USDT');
 console.log('Ticks crossed:', ticksCrossed.toString());
 ```
 
@@ -113,8 +121,8 @@ Quotes the output amount for a multi-hop exact input swap.
 **Example:**
 
 ```javascript
-// Path: WETH → USDC → DAI
-const path = encodePath([WETH, USDC, DAI], [3000, 500]);
+// Path: WVC → USDT → TOKEN_C
+const path = encodePath([WVC, USDT, TOKEN_C], [3000, 500]);
 
 const [amountOut, prices, ticks, gas] = await quoter.callStatic.quoteExactInput(
     path,
@@ -127,30 +135,36 @@ const [amountOut, prices, ticks, gas] = await quoter.callStatic.quoteExactInput(
 ### quoteExactOutputSingle
 
 ```solidity
-function quoteExactOutputSingle(
-    address tokenIn,
-    address tokenOut,
-    uint24 fee,
-    uint256 amountOut,
-    uint160 sqrtPriceLimitX96
-) external override returns (
-    uint256 amountIn,
-    uint160 sqrtPriceX96After,
-    uint32 initializedTicksCrossed,
-    uint256 gasEstimate
-)
+function quoteExactOutputSingle(QuoteExactOutputSingleParams memory params)
+    external
+    returns (
+        uint256 amountIn,
+        uint160 sqrtPriceX96After,
+        uint32 initializedTicksCrossed,
+        uint256 gasEstimate
+    )
 ```
 
 Quotes the input amount needed for an exact output single swap.
 
-**Parameters:**
+**Parameters Struct:**
+
+```solidity
+struct QuoteExactOutputSingleParams {
+    address tokenIn;
+    address tokenOut;
+    uint256 amount;
+    uint24 fee;
+    uint160 sqrtPriceLimitX96;
+}
+```
 
 | Name | Type | Description |
 |------|------|-------------|
 | `tokenIn` | `address` | Input token address |
 | `tokenOut` | `address` | Output token address |
+| `amount` | `uint256` | Exact output amount wanted |
 | `fee` | `uint24` | Pool fee tier |
-| `amountOut` | `uint256` | Exact output amount wanted |
 | `sqrtPriceLimitX96` | `uint160` | Price limit (0 for none) |
 
 **Returns:**
@@ -165,15 +179,17 @@ Quotes the input amount needed for an exact output single swap.
 **Example:**
 
 ```javascript
-const [amountIn, priceAfter, ticksCrossed, gas] = await quoter.callStatic.quoteExactOutputSingle(
-    WETH,
-    USDC,
-    3000,
-    ethers.utils.parseUnits('2000', 6),  // Want exactly 2000 USDC
-    0
-);
+const params = {
+    tokenIn: WVC,
+    tokenOut: USDT,
+    amount: ethers.utils.parseUnits('100', 6),  // Want exactly 100 USDT
+    fee: 3000,
+    sqrtPriceLimitX96: 0
+};
 
-console.log('Required input:', ethers.utils.formatEther(amountIn), 'WETH');
+const [amountIn, priceAfter, ticksCrossed, gas] = await quoter.callStatic.quoteExactOutputSingle(params);
+
+console.log('Required input:', ethers.utils.formatEther(amountIn), 'WVC');
 ```
 
 ---
@@ -229,15 +245,15 @@ function encodePath(tokens, fees) {
     return path;
 }
 
-// WETH → USDC → DAI
-const path = encodePath([WETH, USDC, DAI], [3000, 500]);
+// WVC → USDT → TOKEN_C
+const path = encodePath([WVC, USDT, TOKEN_C], [3000, 500]);
 ```
 
 ### Exact Output Path (Reversed)
 
 ```javascript
-// Want WETH → USDC → DAI, encode as DAI → USDC → WETH
-const path = encodePath([DAI, USDC, WETH], [500, 3000]);
+// Want WVC → USDT → TOKEN_C, encode as TOKEN_C → USDT → WVC
+const path = encodePath([TOKEN_C, USDT, WVC], [500, 3000]);
 ```
 
 ## Understanding Return Values
@@ -272,7 +288,7 @@ async function findBestRoute(tokenIn, tokenOut, amountIn) {
     const routes = [
         { path: [tokenIn, tokenOut], fees: [500] },
         { path: [tokenIn, tokenOut], fees: [3000] },
-        { path: [tokenIn, USDC, tokenOut], fees: [3000, 500] }
+        { path: [tokenIn, USDT, tokenOut], fees: [3000, 500] }
     ];
 
     let best = { amountOut: BigNumber.from(0) };
@@ -298,9 +314,15 @@ async function findBestRoute(tokenIn, tokenOut, amountIn) {
 
 ```javascript
 async function getSwapWithSlippage(tokenIn, tokenOut, fee, amountIn, slippageBps) {
-    const [expectedOut] = await quoter.callStatic.quoteExactInputSingle(
-        tokenIn, tokenOut, fee, amountIn, 0
-    );
+    const params = {
+        tokenIn,
+        tokenOut,
+        amountIn,
+        fee,
+        sqrtPriceLimitX96: 0
+    };
+
+    const [expectedOut] = await quoter.callStatic.quoteExactInputSingle(params);
 
     const minOut = expectedOut.mul(10000 - slippageBps).div(10000);
 
@@ -313,21 +335,27 @@ async function getSwapWithSlippage(tokenIn, tokenOut, fee, amountIn, slippageBps
 
 // Usage: 0.5% slippage
 const { expectedOut, minOut } = await getSwapWithSlippage(
-    WETH, USDC, 3000, ethers.utils.parseEther('1'), 50
+    WVC, USDT, 3000, ethers.utils.parseEther('1'), 50
 );
 ```
 
 ### Estimate Gas Cost
 
 ```javascript
-const [amountOut, , ticksCrossed, gasEstimate] = await quoter.callStatic.quoteExactInputSingle(
-    WETH, USDC, 3000, ethers.utils.parseEther('10'), 0
-);
+const params = {
+    tokenIn: WVC,
+    tokenOut: USDT,
+    amountIn: ethers.utils.parseEther('10'),
+    fee: 3000,
+    sqrtPriceLimitX96: 0
+};
+
+const [amountOut, , ticksCrossed, gasEstimate] = await quoter.callStatic.quoteExactInputSingle(params);
 
 const gasPrice = await provider.getGasPrice();
 const gasCost = gasEstimate.mul(gasPrice);
 
-console.log('Estimated gas cost:', ethers.utils.formatEther(gasCost), 'ETH');
+console.log('Estimated gas cost:', ethers.utils.formatEther(gasCost), 'VC');
 ```
 
 ## Important Notes
@@ -358,52 +386,58 @@ Large swaps crossing many ticks may exceed block gas limits in simulation. Consi
 ## Interface
 
 ```solidity
-interface IVinuSwapQuoter {
-    function quoteExactInputSingle(
-        address tokenIn,
-        address tokenOut,
-        uint24 fee,
-        uint256 amountIn,
-        uint160 sqrtPriceLimitX96
-    ) external returns (
-        uint256 amountOut,
-        uint160 sqrtPriceX96After,
-        uint32 initializedTicksCrossed,
-        uint256 gasEstimate
-    );
+interface IQuoterV2 {
+    struct QuoteExactInputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint256 amountIn;
+        uint24 fee;
+        uint160 sqrtPriceLimitX96;
+    }
 
-    function quoteExactInput(
-        bytes memory path,
-        uint256 amountIn
-    ) external returns (
-        uint256 amountOut,
-        uint160[] memory sqrtPriceX96AfterList,
-        uint32[] memory initializedTicksCrossedList,
-        uint256 gasEstimate
-    );
+    struct QuoteExactOutputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint256 amount;
+        uint24 fee;
+        uint160 sqrtPriceLimitX96;
+    }
 
-    function quoteExactOutputSingle(
-        address tokenIn,
-        address tokenOut,
-        uint24 fee,
-        uint256 amountOut,
-        uint160 sqrtPriceLimitX96
-    ) external returns (
-        uint256 amountIn,
-        uint160 sqrtPriceX96After,
-        uint32 initializedTicksCrossed,
-        uint256 gasEstimate
-    );
+    function quoteExactInputSingle(QuoteExactInputSingleParams memory params)
+        external
+        returns (
+            uint256 amountOut,
+            uint160 sqrtPriceX96After,
+            uint32 initializedTicksCrossed,
+            uint256 gasEstimate
+        );
 
-    function quoteExactOutput(
-        bytes memory path,
-        uint256 amountOut
-    ) external returns (
-        uint256 amountIn,
-        uint160[] memory sqrtPriceX96AfterList,
-        uint32[] memory initializedTicksCrossedList,
-        uint256 gasEstimate
-    );
+    function quoteExactInput(bytes memory path, uint256 amountIn)
+        external
+        returns (
+            uint256 amountOut,
+            uint160[] memory sqrtPriceX96AfterList,
+            uint32[] memory initializedTicksCrossedList,
+            uint256 gasEstimate
+        );
+
+    function quoteExactOutputSingle(QuoteExactOutputSingleParams memory params)
+        external
+        returns (
+            uint256 amountIn,
+            uint160 sqrtPriceX96After,
+            uint32 initializedTicksCrossed,
+            uint256 gasEstimate
+        );
+
+    function quoteExactOutput(bytes memory path, uint256 amountOut)
+        external
+        returns (
+            uint256 amountIn,
+            uint160[] memory sqrtPriceX96AfterList,
+            uint32[] memory initializedTicksCrossedList,
+            uint256 gasEstimate
+        );
 }
 ```
 

@@ -41,7 +41,7 @@ The core contracts provide the fundamental AMM functionality and safety guarante
 │                                                                 │
 │  Core Functions:                                                │
 │  - initialize()  - swap()   - mint()   - burn()                │
-│  - collect()     - flash()  - observe()                        │
+│  - collect()     - observe()                                    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -177,7 +177,6 @@ modifier noDelegateCall() {
 | `Burn` | Liquidity is removed from a position |
 | `Swap` | A swap is executed |
 | `Collect` | Fees are collected from a position |
-| `Flash` | A flash loan is executed |
 | `CollectProtocol` | Protocol fees are withdrawn |
 | `SetFeeProtocol` | Protocol fee setting is changed |
 | `IncreaseObservationCardinalityNext` | Oracle capacity increased |
@@ -203,8 +202,6 @@ modifier noDelegateCall() {
 | `IIA` | Invalid input amount |
 | `SPL` | sqrtPriceLimit invalid |
 | `L` | Liquidity overflow |
-| `F0` | Flash loan token0 not returned |
-| `F1` | Flash loan token1 not returned |
 
 ## Next Steps
 

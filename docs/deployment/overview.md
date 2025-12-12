@@ -24,7 +24,7 @@ VinuSwap contracts must be deployed in a specific order due to dependencies:
    └── VinuSwapQuoter
 
 4. Utility
-   └── WETH9 (if not existing)
+   └── WVC (if not existing)
    └── PoolInitHelper
 ```
 
@@ -54,15 +54,15 @@ Phase 2: Core Infrastructure
 Phase 3: Periphery
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  [SwapRouter]    [PositionManager]    [Quoter]    [Descriptor]              │
-│    factory         factory             factory      WETH9                   │
-│    WETH9           WETH9               factory                              │
+│    factory         factory             factory      WVC                     │
+│    WVC             WVC                 factory                              │
 │                    descriptor                                               │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 Phase 4: Pool Creation
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  [Pool 1: WETH/USDC]    [Pool 2: WETH/DAI]    [Pool 3: USDC/DAI]           │
+│  [Pool 1: WVC/USDT]     [Pool 2: WVC/TOKEN_A]  [Pool 3: USDT/TOKEN_B]      │
 │    fee: 3000              fee: 3000             fee: 500                    │
 │    tickSpacing: 60        tickSpacing: 60       tickSpacing: 10             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -161,7 +161,7 @@ After deployment, document addresses:
   "network": "vinu",
   "chainId": 206,
   "contracts": {
-    "WETH9": "0x...",
+    "WVC": "0x...",
     "TieredDiscount": "0x...",
     "Controller": "0x...",
     "VinuSwapFactory": "0x...",
@@ -173,8 +173,8 @@ After deployment, document addresses:
     "PoolInitHelper": "0x..."
   },
   "pools": {
-    "WETH_USDC_3000": "0x...",
-    "WETH_DAI_3000": "0x..."
+    "WVC_USDT_3000": "0x...",
+    "WVC_TOKEN_A_3000": "0x..."
   }
 }
 ```

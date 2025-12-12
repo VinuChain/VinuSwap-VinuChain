@@ -96,10 +96,14 @@ async function estimateSwapSavings(
     amountIn,
     discountBps
 ) {
-    // Get quote at base fee
-    const [amountOut] = await quoter.callStatic.quoteExactInputSingle(
-        tokenIn, tokenOut, poolFee, amountIn, 0
-    );
+    // Get quote at base fee (IQuoterV2 uses struct parameters)
+    const [amountOut] = await quoter.callStatic.quoteExactInputSingle({
+        tokenIn,
+        tokenOut,
+        amountIn,
+        fee: poolFee,
+        sqrtPriceLimitX96: 0
+    });
 
     // Calculate fee amounts
     const baseFeeAmount = amountIn.mul(poolFee).div(1000000);
@@ -150,18 +154,18 @@ const projection = projectAnnualSavings(10000, 20, 0.3, 3);
 
 ```javascript
 async function buyDiscountTokens(amountToBuy) {
-    // Get quote
-    const [amountIn] = await quoter.callStatic.quoteExactOutputSingle(
-        WETH,
-        DISCOUNT_TOKEN,
-        3000,
-        amountToBuy,
-        0
-    );
+    // Get quote (IQuoterV2 uses struct parameters)
+    const [amountIn] = await quoter.callStatic.quoteExactOutputSingle({
+        tokenIn: WVC,
+        tokenOut: DISCOUNT_TOKEN,
+        amount: amountToBuy,
+        fee: 3000,
+        sqrtPriceLimitX96: 0
+    });
 
     // Execute swap
     await router.exactOutputSingle({
-        tokenIn: WETH,
+        tokenIn: WVC,
         tokenOut: DISCOUNT_TOKEN,
         fee: 3000,
         recipient: signer.address,
@@ -208,7 +212,7 @@ Some pools may have different discount configurations using OverridableFeeManage
 
 ```javascript
 async function getPoolFeeManager(pool, overridableFeeManager) {
-    const override = await overridableFeeManager.overrides(pool);
+    const override = await overridableFeeManager.feeManagerOverride(pool);
 
     if (override === ethers.constants.AddressZero) {
         return await overridableFeeManager.defaultFeeManager();

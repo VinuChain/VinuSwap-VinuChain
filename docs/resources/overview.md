@@ -11,7 +11,7 @@ Security best practices and considerations:
 - Smart contract security features
 - Integration security patterns
 - Common vulnerabilities and mitigations
-- Callback and flash loan security
+- Callback security
 - Deployment verification procedures
 
 ### [FAQ](faq.md)
