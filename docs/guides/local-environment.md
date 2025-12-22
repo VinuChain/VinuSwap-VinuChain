@@ -11,7 +11,7 @@ This guide walks through setting up a local development environment for VinuSwap
 ## Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/VinuSwap-VinuChain.git
+git clone https://github.com/VinuChain/VinuSwap-VinuChain.git
 cd VinuSwap-VinuChain
 ```
 
