@@ -24,7 +24,6 @@ import { TickMath, nearestUsableTick, Position, Pool } from "@uniswap/v3-sdk";
 import JSBI from "jsbi";
 
 class VinuSwap {
-  public fee: number;
   public pool: VinuSwapPool;
   public quoter: VinuSwapQuoter;
   public router: SwapRouter;
@@ -34,6 +33,13 @@ class VinuSwap {
   public signerOrProvider: ethers.Signer | ethers.providers.Provider;
   public _significantDigits: number = 18;
 
+  // Cached immutable pool/token data, populated in create() so we never
+  // re-fetch values that cannot change after deployment.
+  public readonly fee: number;
+  public readonly tickSpacing: number;
+  public readonly token0Decimals: number;
+  public readonly token1Decimals: number;
+
   private constructor(
     pool: VinuSwapPool,
     token0Contract: ethers.Contract,
@@ -41,7 +47,11 @@ class VinuSwap {
     quoter: VinuSwapQuoter,
     router: SwapRouter,
     positionManager: NonfungiblePositionManager,
-    signerOrProvider: ethers.Signer | ethers.providers.Provider
+    signerOrProvider: ethers.Signer | ethers.providers.Provider,
+    fee: number,
+    tickSpacing: number,
+    token0Decimals: number,
+    token1Decimals: number
   ) {
     this.pool = pool;
     this.quoter = quoter;
@@ -50,6 +60,10 @@ class VinuSwap {
     this.token0Contract = token0Contract;
     this.token1Contract = token1Contract;
     this.signerOrProvider = signerOrProvider;
+    this.fee = fee;
+    this.tickSpacing = tickSpacing;
+    this.token0Decimals = token0Decimals;
+    this.token1Decimals = token1Decimals;
   }
 
   /**
@@ -65,7 +79,11 @@ class VinuSwap {
       this.quoter.connect(signer),
       this.router.connect(signer),
       this.positionManager.connect(signer),
-      signer
+      signer,
+      this.fee,
+      this.tickSpacing,
+      this.token0Decimals,
+      this.token1Decimals
     );
   }
 
@@ -108,8 +126,12 @@ class VinuSwap {
       signerOrProvider
     ) as VinuSwapQuoter;
 
-    const token0Address = await pool.token0();
-    const token1Address = await pool.token1();
+    const [token0Address, token1Address, fee, tickSpacing] = await Promise.all([
+      pool.token0(),
+      pool.token1(),
+      pool.fee(),
+      pool.tickSpacing(),
+    ]);
 
     if (tokenA != token0Address && tokenA != token1Address) {
       throw new Error("TokenA address does not match");
@@ -135,6 +157,11 @@ class VinuSwap {
       signerOrProvider
     );
 
+    const [token0Decimals, token1Decimals] = await Promise.all([
+      token0Contract.decimals(),
+      token1Contract.decimals(),
+    ]);
+
     return new VinuSwap(
       pool,
       token0Contract,
@@ -142,7 +169,11 @@ class VinuSwap {
       quoter,
       router,
       positionManager,
-      signerOrProvider
+      signerOrProvider,
+      fee,
+      tickSpacing,
+      token0Decimals,
+      token1Decimals
     );
   }
 
@@ -198,9 +229,10 @@ class VinuSwap {
 
   /**
    * The fee of the pool, expressed in bips (0.01%).
+   * Cached at construction time since the fee is immutable per pool.
    */
   public async poolFee(): Promise<number> {
-    return await this.pool.fee();
+    return this.fee;
   }
 
   /**
@@ -219,18 +251,29 @@ class VinuSwap {
   }
 
   protected async asUniswapPool(): Promise<Pool> {
-    const slot0 = await this.pool.slot0();
-    const token0Decimals = await this.token0Contract.decimals();
-    const token1Decimals = await this.token1Contract.decimals();
+    const [slot0, liquidity] = await Promise.all([
+      this.pool.slot0(),
+      this.pool.liquidity(),
+    ]);
     const chainId = 0; // We actually don't care about this
     // We could also retrieve the true token names from the contracts,
     // but it's unnecessary and slows down the process
     return new Pool(
-      new Token(chainId, this.token0Contract.address, token0Decimals, "Token0"),
-      new Token(chainId, this.token1Contract.address, token1Decimals, "Token1"),
-      await this.poolFee(),
+      new Token(
+        chainId,
+        this.token0Contract.address,
+        this.token0Decimals,
+        "Token0"
+      ),
+      new Token(
+        chainId,
+        this.token1Contract.address,
+        this.token1Decimals,
+        "Token1"
+      ),
+      this.fee,
       slot0.sqrtPriceX96.toString(),
-      (await this.pool.liquidity()).toString(),
+      liquidity.toString(),
       slot0.tick
     );
   }
@@ -265,8 +308,8 @@ class VinuSwap {
     nftId: BigNumberish
   ): Promise<[string, string]> {
     return await withCustomTickSpacing(
-      await this.poolFee(),
-      await this.pool.tickSpacing(),
+      this.fee,
+      this.tickSpacing,
       async () => {
         const position = new Position({
           pool: await this.asUniswapPool(),
@@ -292,8 +335,8 @@ class VinuSwap {
    */
   public async positionAmount0(nftId: BigNumberish): Promise<BigNumber> {
     return await withCustomTickSpacing(
-      await this.poolFee(),
-      await this.pool.tickSpacing(),
+      this.fee,
+      this.tickSpacing,
       async () => {
         const position = new Position({
           pool: await this.asUniswapPool(),
@@ -316,8 +359,8 @@ class VinuSwap {
    */
   public async positionAmount1(nftId: BigNumberish): Promise<BigNumber> {
     return await withCustomTickSpacing(
-      await this.poolFee(),
-      await this.pool.tickSpacing(),
+      this.fee,
+      this.tickSpacing,
       async () => {
         const position = new Position({
           pool: await this.asUniswapPool(),
@@ -429,10 +472,8 @@ class VinuSwap {
       JSBI.BigInt(sqrtRatioX96Upper.toString())
     );
 
-    const tickSpacing = await this.pool.tickSpacing();
-
-    tickLower = nearestUsableTick(tickLower, tickSpacing);
-    tickUpper = nearestUsableTick(tickUpper, tickSpacing);
+    tickLower = nearestUsableTick(tickLower, this.tickSpacing);
+    tickUpper = nearestUsableTick(tickUpper, this.tickSpacing);
 
     if (tickLower < TickMath.MIN_TICK || tickUpper > TickMath.MAX_TICK) {
       throw new Error("Invalid tick range");
@@ -440,7 +481,7 @@ class VinuSwap {
 
     let slippageBounds: any;
 
-    await withCustomTickSpacing(await this.poolFee(), tickSpacing, async () => {
+    await withCustomTickSpacing(this.fee, this.tickSpacing, async () => {
       const pool = await this.asUniswapPool();
 
       const position = Position.fromAmounts({
@@ -461,7 +502,7 @@ class VinuSwap {
       {
         token0: this.token0Contract.address,
         token1: this.token1Contract.address,
-        fee: await this.poolFee(),
+        fee: this.fee,
         tickLower,
         tickUpper,
         amount0Desired,
@@ -491,8 +532,8 @@ class VinuSwap {
     amount1Desired: BigNumberish
   ): Promise<[BigNumber, BigNumber]> {
     return await withCustomTickSpacing(
-      await this.poolFee(),
-      await this.pool.tickSpacing(),
+      this.fee,
+      this.tickSpacing,
       async () => {
         const sqrtRatioX96Lower = encodePrice(ratioLower.toString());
         const sqrtRatioX96Upper = encodePrice(ratioUpper.toString());
@@ -504,10 +545,8 @@ class VinuSwap {
           JSBI.BigInt(sqrtRatioX96Upper.toString())
         );
 
-        const tickSpacing = await this.pool.tickSpacing();
-
-        tickLower = nearestUsableTick(tickLower, tickSpacing);
-        tickUpper = nearestUsableTick(tickUpper, tickSpacing);
+        tickLower = nearestUsableTick(tickLower, this.tickSpacing);
+        tickUpper = nearestUsableTick(tickUpper, this.tickSpacing);
 
         if (tickLower < TickMath.MIN_TICK || tickUpper > TickMath.MAX_TICK) {
           throw new Error("Invalid tick range");
@@ -563,7 +602,7 @@ class VinuSwap {
     const quote = await this.quoter.callStatic.quoteExactInputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
-      fee: await this.poolFee(),
+      fee: this.fee,
       amountIn,
       sqrtPriceLimitX96: 0,
     });
@@ -608,7 +647,7 @@ class VinuSwap {
     const tx = await this.router.exactInputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
-      fee: await this.poolFee(),
+      fee: this.fee,
       amountIn,
       amountOutMinimum,
       recipient,
@@ -649,7 +688,7 @@ class VinuSwap {
     const quote = await this.quoter.callStatic.quoteExactOutputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
-      fee: await this.poolFee(),
+      fee: this.fee,
       amount: amountOut, // Note that the nomenclature is different here compared to quoteExactInput
       sqrtPriceLimitX96: 0,
     });
@@ -694,7 +733,7 @@ class VinuSwap {
     const tx = await this.router.exactOutputSingle({
       tokenIn: tokenIn,
       tokenOut: tokenOut,
-      fee: await this.poolFee(),
+      fee: this.fee,
       amountOut,
       amountInMaximum,
       recipient,
@@ -803,8 +842,8 @@ class VinuSwap {
     amount1Desired: BigNumberish
   ): Promise<[BigNumber, BigNumber]> {
     return await withCustomTickSpacing(
-      await this.poolFee(),
-      await this.pool.tickSpacing(),
+      this.fee,
+      this.tickSpacing,
       async () => {
         const oldPositionRaw = await this.positionManager.positions(nftId);
         const oldPosition = new Position({
@@ -886,8 +925,8 @@ class VinuSwap {
     liquidity: BigNumberish
   ): Promise<[BigNumber, BigNumber]> {
     return await withCustomTickSpacing(
-      await this.poolFee(),
-      await this.pool.tickSpacing(),
+      this.fee,
+      this.tickSpacing,
       async () => {
         const oldPositionRaw = await this.positionManager.positions(nftId);
         const oldPosition = new Position({
