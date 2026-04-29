@@ -5,13 +5,10 @@ import { SwapRouter } from "../typechain-types/contracts/periphery/SwapRouter";
 import { NonfungiblePositionManager } from "../typechain-types/contracts/periphery/NonfungiblePositionManager";
 import { VinuSwapQuoter } from "../typechain-types/contracts/periphery/VinuSwapQuoter";
 
-// Hardhat artifact JSONs include bytecode, deployedBytecode, and source maps
-// (~MBs per file) that bloat browser bundles even though only `.abi` is used.
-// These ABI-only JSONs are produced by `npm run build:abis` post-compile.
-import VinuSwapPoolAbi from "./abi/VinuSwapPool.json";
-import SwapRouterAbi from "./abi/SwapRouter.json";
-import NonfungiblePositionManagerAbi from "./abi/NonfungiblePositionManager.json";
-import VinuSwapQuoterAbi from "./abi/VinuSwapQuoter.json";
+import { VinuSwapPool__factory } from "../typechain-types/factories/contracts/core/VinuSwapPool__factory";
+import { SwapRouter__factory } from "../typechain-types/factories/contracts/periphery/SwapRouter__factory";
+import { NonfungiblePositionManager__factory } from "../typechain-types/factories/contracts/periphery/NonfungiblePositionManager__factory";
+import { VinuSwapQuoter__factory } from "../typechain-types/factories/contracts/periphery/VinuSwapQuoter__factory";
 
 import ERC20Abi from "./abi/ERC20.json";
 
@@ -36,8 +33,7 @@ class VinuSwap {
   public signerOrProvider: ethers.Signer | ethers.providers.Provider;
   public _significantDigits: number = 18;
 
-  // Cached immutable pool/token data, populated in create() so we never
-  // re-fetch values that cannot change after deployment.
+  // Immutable pool/token data — fetched once in create().
   public readonly fee: number;
   public readonly tickSpacing: number;
   public readonly token0Decimals: number;
@@ -113,19 +109,19 @@ class VinuSwap {
   ): Promise<VinuSwap> {
     const router = new ethers.Contract(
       routerAddress,
-      SwapRouterAbi,
+      SwapRouter__factory.abi,
       signerOrProvider
     ) as SwapRouter;
 
     const pool = new ethers.Contract(
       poolAddress,
-      VinuSwapPoolAbi,
+      VinuSwapPool__factory.abi,
       signerOrProvider
     ) as VinuSwapPool;
 
     const quoter = new ethers.Contract(
       quoterAddress,
-      VinuSwapQuoterAbi,
+      VinuSwapQuoter__factory.abi,
       signerOrProvider
     ) as VinuSwapQuoter;
 
@@ -145,7 +141,7 @@ class VinuSwap {
 
     const positionManager = new ethers.Contract(
       positionManagerAddress,
-      NonfungiblePositionManagerAbi,
+      NonfungiblePositionManager__factory.abi,
       signerOrProvider
     ) as NonfungiblePositionManager;
 
@@ -232,7 +228,6 @@ class VinuSwap {
 
   /**
    * The fee of the pool, expressed in bips (0.01%).
-   * Cached at construction time since the fee is immutable per pool.
    */
   public async poolFee(): Promise<number> {
     return this.fee;
@@ -253,32 +248,74 @@ class VinuSwap {
     return [protocolFees.token0, protocolFees.token1];
   }
 
-  protected async asUniswapPool(): Promise<Pool> {
+  private async fetchPoolState(): Promise<{
+    sqrtPriceX96: string;
+    tick: number;
+    liquidity: string;
+  }> {
     const [slot0, liquidity] = await Promise.all([
       this.pool.slot0(),
       this.pool.liquidity(),
     ]);
-    const chainId = 0; // We actually don't care about this
-    // We could also retrieve the true token names from the contracts,
-    // but it's unnecessary and slows down the process
+    return {
+      sqrtPriceX96: slot0.sqrtPriceX96.toString(),
+      tick: slot0.tick,
+      liquidity: liquidity.toString(),
+    };
+  }
+
+  // Synchronous Pool construction. Must run inside withCustomTickSpacing
+  // because @uniswap/v3-sdk's Pool constructor reads TICK_SPACINGS[fee]; once
+  // built, the resulting Pool stores tickSpacing as a field so subsequent
+  // Position math is safe outside the lock.
+  private buildUniswapPool(state: {
+    sqrtPriceX96: string;
+    tick: number;
+    liquidity: string;
+  }): Pool {
+    const chainId = 0; // We don't care about chainId for math
     return new Pool(
-      new Token(
-        chainId,
-        this.token0Contract.address,
-        this.token0Decimals,
-        "Token0"
-      ),
-      new Token(
-        chainId,
-        this.token1Contract.address,
-        this.token1Decimals,
-        "Token1"
-      ),
+      new Token(chainId, this.token0Contract.address, this.token0Decimals, "Token0"),
+      new Token(chainId, this.token1Contract.address, this.token1Decimals, "Token1"),
       this.fee,
-      slot0.sqrtPriceX96.toString(),
-      liquidity.toString(),
-      slot0.tick
+      state.sqrtPriceX96,
+      state.liquidity,
+      state.tick
     );
+  }
+
+  protected async asUniswapPool(): Promise<Pool> {
+    const state = await this.fetchPoolState();
+    return await withCustomTickSpacing(this.fee, this.tickSpacing, () =>
+      this.buildUniswapPool(state)
+    );
+  }
+
+  // Fetches everything needed to build a Position for `nftId` in parallel,
+  // then constructs Pool + Position inside the tick-spacing lock. liquidity
+  // override is supported for "what-if" quotes (decreaseLiquidity).
+  private async loadPosition(
+    nftId: BigNumberish,
+    liquidityOverride?: BigNumberish
+  ): Promise<{
+    pool: Pool;
+    position: Position;
+    raw: Awaited<ReturnType<NonfungiblePositionManager["positions"]>>;
+  }> {
+    const [poolState, raw] = await Promise.all([
+      this.fetchPoolState(),
+      this.positionManager.positions(nftId),
+    ]);
+    return await withCustomTickSpacing(this.fee, this.tickSpacing, () => {
+      const pool = this.buildUniswapPool(poolState);
+      const position = new Position({
+        pool,
+        liquidity: (liquidityOverride ?? raw.liquidity).toString(),
+        tickLower: raw.tickLower,
+        tickUpper: raw.tickUpper,
+      });
+      return { pool, position, raw };
+    });
   }
 
   /**
@@ -310,27 +347,11 @@ class VinuSwap {
   public async positionPriceBounds(
     nftId: BigNumberish
   ): Promise<[string, string]> {
-    return await withCustomTickSpacing(
-      this.fee,
-      this.tickSpacing,
-      async () => {
-        const [uniswapPool, positionRaw] = await Promise.all([
-          this.asUniswapPool(),
-          this.positionManager.positions(nftId),
-        ]);
-        const position = new Position({
-          pool: uniswapPool,
-          liquidity: positionRaw.liquidity.toString(),
-          tickLower: positionRaw.tickLower,
-          tickUpper: positionRaw.tickUpper,
-        });
-
-        return [
-          position.token0PriceLower.toSignificant(this._significantDigits),
-          position.token0PriceUpper.toSignificant(this._significantDigits),
-        ];
-      }
-    );
+    const { position } = await this.loadPosition(nftId);
+    return [
+      position.token0PriceLower.toSignificant(this._significantDigits),
+      position.token0PriceUpper.toSignificant(this._significantDigits),
+    ];
   }
 
   /**
@@ -339,24 +360,8 @@ class VinuSwap {
    * @returns The amount of token0
    */
   public async positionAmount0(nftId: BigNumberish): Promise<BigNumber> {
-    return await withCustomTickSpacing(
-      this.fee,
-      this.tickSpacing,
-      async () => {
-        const [uniswapPool, positionRaw] = await Promise.all([
-          this.asUniswapPool(),
-          this.positionManager.positions(nftId),
-        ]);
-        const position = new Position({
-          pool: uniswapPool,
-          liquidity: positionRaw.liquidity.toString(),
-          tickLower: positionRaw.tickLower,
-          tickUpper: positionRaw.tickUpper,
-        });
-
-        return BigNumber.from(position.amount0.numerator.toString());
-      }
-    );
+    const { position } = await this.loadPosition(nftId);
+    return BigNumber.from(position.amount0.numerator.toString());
   }
 
   /**
@@ -365,24 +370,8 @@ class VinuSwap {
    * @returns The amount of token1
    */
   public async positionAmount1(nftId: BigNumberish): Promise<BigNumber> {
-    return await withCustomTickSpacing(
-      this.fee,
-      this.tickSpacing,
-      async () => {
-        const [uniswapPool, positionRaw] = await Promise.all([
-          this.asUniswapPool(),
-          this.positionManager.positions(nftId),
-        ]);
-        const position = new Position({
-          pool: uniswapPool,
-          liquidity: positionRaw.liquidity.toString(),
-          tickLower: positionRaw.tickLower,
-          tickUpper: positionRaw.tickUpper,
-        });
-
-        return BigNumber.from(position.amount1.numerator.toString());
-      }
-    );
+    const { position } = await this.loadPosition(nftId);
+    return BigNumber.from(position.amount1.numerator.toString());
   }
 
   /**
@@ -488,24 +477,21 @@ class VinuSwap {
       throw new Error("Invalid tick range");
     }
 
-    let slippageBounds: any;
-
-    await withCustomTickSpacing(this.fee, this.tickSpacing, async () => {
-      const pool = await this.asUniswapPool();
-
-      const position = Position.fromAmounts({
-        pool,
-        tickLower,
-        tickUpper,
-        amount0: amount0Desired.toString(),
-        amount1: amount1Desired.toString(),
-        useFullPrecision: true,
-      });
-
-      slippageBounds = position.mintAmountsWithSlippage(
-        new Percent(Math.floor(slippageRatio * 10_000), 10_000)
-      );
+    const poolState = await this.fetchPoolState();
+    const pool = await withCustomTickSpacing(this.fee, this.tickSpacing, () =>
+      this.buildUniswapPool(poolState)
+    );
+    const position = Position.fromAmounts({
+      pool,
+      tickLower,
+      tickUpper,
+      amount0: amount0Desired.toString(),
+      amount1: amount1Desired.toString(),
+      useFullPrecision: true,
     });
+    const slippageBounds = position.mintAmountsWithSlippage(
+      new Percent(Math.floor(slippageRatio * 10_000), 10_000)
+    );
 
     const tx = await this.positionManager.mint(
       {
@@ -540,44 +526,40 @@ class VinuSwap {
     amount0Desired: BigNumberish,
     amount1Desired: BigNumberish
   ): Promise<[BigNumber, BigNumber]> {
-    return await withCustomTickSpacing(
-      this.fee,
-      this.tickSpacing,
-      async () => {
-        const sqrtRatioX96Lower = encodePrice(ratioLower.toString());
-        const sqrtRatioX96Upper = encodePrice(ratioUpper.toString());
+    const sqrtRatioX96Lower = encodePrice(ratioLower.toString());
+    const sqrtRatioX96Upper = encodePrice(ratioUpper.toString());
 
-        let tickLower = TickMath.getTickAtSqrtRatio(
-          JSBI.BigInt(sqrtRatioX96Lower.toString())
-        );
-        let tickUpper = TickMath.getTickAtSqrtRatio(
-          JSBI.BigInt(sqrtRatioX96Upper.toString())
-        );
-
-        tickLower = nearestUsableTick(tickLower, this.tickSpacing);
-        tickUpper = nearestUsableTick(tickUpper, this.tickSpacing);
-
-        if (tickLower < TickMath.MIN_TICK || tickUpper > TickMath.MAX_TICK) {
-          throw new Error("Invalid tick range");
-        }
-
-        const pool = await this.asUniswapPool();
-
-        const position = Position.fromAmounts({
-          pool,
-          tickLower,
-          tickUpper,
-          amount0: amount0Desired.toString(),
-          amount1: amount1Desired.toString(),
-          useFullPrecision: true,
-        });
-
-        return [
-          BigNumber.from(position.amount0.numerator.toString()),
-          BigNumber.from(position.amount1.numerator.toString()),
-        ];
-      }
+    let tickLower = TickMath.getTickAtSqrtRatio(
+      JSBI.BigInt(sqrtRatioX96Lower.toString())
     );
+    let tickUpper = TickMath.getTickAtSqrtRatio(
+      JSBI.BigInt(sqrtRatioX96Upper.toString())
+    );
+
+    tickLower = nearestUsableTick(tickLower, this.tickSpacing);
+    tickUpper = nearestUsableTick(tickUpper, this.tickSpacing);
+
+    if (tickLower < TickMath.MIN_TICK || tickUpper > TickMath.MAX_TICK) {
+      throw new Error("Invalid tick range");
+    }
+
+    const poolState = await this.fetchPoolState();
+    const pool = await withCustomTickSpacing(this.fee, this.tickSpacing, () =>
+      this.buildUniswapPool(poolState)
+    );
+    const position = Position.fromAmounts({
+      pool,
+      tickLower,
+      tickUpper,
+      amount0: amount0Desired.toString(),
+      amount1: amount1Desired.toString(),
+      useFullPrecision: true,
+    });
+
+    return [
+      BigNumber.from(position.amount0.numerator.toString()),
+      BigNumber.from(position.amount1.numerator.toString()),
+    ];
   }
 
   /**
@@ -850,51 +832,32 @@ class VinuSwap {
     amount0Desired: BigNumberish,
     amount1Desired: BigNumberish
   ): Promise<[BigNumber, BigNumber]> {
-    return await withCustomTickSpacing(
-      this.fee,
-      this.tickSpacing,
-      async () => {
-        const [uniswapPool, oldPositionRaw] = await Promise.all([
-          this.asUniswapPool(),
-          this.positionManager.positions(nftId),
-        ]);
-        const oldPosition = new Position({
-          pool: uniswapPool,
-          liquidity: oldPositionRaw.liquidity.toString(),
-          tickLower: oldPositionRaw.tickLower,
-          tickUpper: oldPositionRaw.tickUpper,
-        });
+    const { pool, position: oldPosition, raw } = await this.loadPosition(nftId);
 
-        const amount0 = oldPosition.amount0.numerator.toString();
-        const amount1 = oldPosition.amount1.numerator.toString();
+    const amount0 = oldPosition.amount0.numerator.toString();
+    const amount1 = oldPosition.amount1.numerator.toString();
 
-        const newPosition = Position.fromAmounts({
-          pool: uniswapPool,
-          tickLower: oldPositionRaw.tickLower,
-          tickUpper: oldPositionRaw.tickUpper,
-          amount0: BigNumber.from(amount0)
-            .add(BigNumber.from(amount0Desired))
-            .toString(),
-          amount1: BigNumber.from(amount1)
-            .add(BigNumber.from(amount1Desired))
-            .toString(),
-          useFullPrecision: true,
-        });
+    const newPosition = Position.fromAmounts({
+      pool,
+      tickLower: raw.tickLower,
+      tickUpper: raw.tickUpper,
+      amount0: BigNumber.from(amount0)
+        .add(BigNumber.from(amount0Desired))
+        .toString(),
+      amount1: BigNumber.from(amount1)
+        .add(BigNumber.from(amount1Desired))
+        .toString(),
+      useFullPrecision: true,
+    });
 
-        return [
-          BigNumber.from(
-            newPosition.amount0
-              .subtract(oldPosition.amount0)
-              .numerator.toString()
-          ),
-          BigNumber.from(
-            newPosition.amount1
-              .subtract(oldPosition.amount1)
-              .numerator.toString()
-          ),
-        ];
-      }
-    );
+    return [
+      BigNumber.from(
+        newPosition.amount0.subtract(oldPosition.amount0).numerator.toString()
+      ),
+      BigNumber.from(
+        newPosition.amount1.subtract(oldPosition.amount1).numerator.toString()
+      ),
+    ];
   }
 
   /**
@@ -936,42 +899,22 @@ class VinuSwap {
     nftId: BigNumberish,
     liquidity: BigNumberish
   ): Promise<[BigNumber, BigNumber]> {
-    return await withCustomTickSpacing(
-      this.fee,
-      this.tickSpacing,
-      async () => {
-        const [uniswapPool, oldPositionRaw] = await Promise.all([
-          this.asUniswapPool(),
-          this.positionManager.positions(nftId),
-        ]);
-        const oldPosition = new Position({
-          pool: uniswapPool,
-          liquidity: oldPositionRaw.liquidity.toString(),
-          tickLower: oldPositionRaw.tickLower,
-          tickUpper: oldPositionRaw.tickUpper,
-        });
+    const { pool, position: oldPosition, raw } = await this.loadPosition(nftId);
+    const newPosition = new Position({
+      pool,
+      liquidity: raw.liquidity.sub(liquidity).toString(),
+      tickLower: raw.tickLower,
+      tickUpper: raw.tickUpper,
+    });
 
-        const newPosition = new Position({
-          pool: uniswapPool,
-          liquidity: oldPositionRaw.liquidity.sub(liquidity).toString(),
-          tickLower: oldPositionRaw.tickLower,
-          tickUpper: oldPositionRaw.tickUpper,
-        });
-
-        return [
-          BigNumber.from(
-            oldPosition.amount0
-              .subtract(newPosition.amount0)
-              .numerator.toString()
-          ),
-          BigNumber.from(
-            oldPosition.amount1
-              .subtract(newPosition.amount1)
-              .numerator.toString()
-          ),
-        ];
-      }
-    );
+    return [
+      BigNumber.from(
+        oldPosition.amount0.subtract(newPosition.amount0).numerator.toString()
+      ),
+      BigNumber.from(
+        oldPosition.amount1.subtract(newPosition.amount1).numerator.toString()
+      ),
+    ];
   }
 
   /**
