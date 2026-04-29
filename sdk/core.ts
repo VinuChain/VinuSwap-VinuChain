@@ -2,13 +2,16 @@ import { ethers, BigNumberish } from "ethers";
 
 import { VinuSwapPool } from "../typechain-types/contracts/core/VinuSwapPool";
 import { SwapRouter } from "../typechain-types/contracts/periphery/SwapRouter";
-import VinuSwapPoolInfo from "../artifacts/contracts/core/VinuSwapPool.sol/VinuSwapPool.json";
-import SwapRouterInfo from "../artifacts/contracts/periphery/SwapRouter.sol/SwapRouter.json";
 import { NonfungiblePositionManager } from "../typechain-types/contracts/periphery/NonfungiblePositionManager";
-import NonfungiblePositionManagerInfo from "../artifacts/contracts/periphery/NonfungiblePositionManager.sol/NonfungiblePositionManager.json";
-
 import { VinuSwapQuoter } from "../typechain-types/contracts/periphery/VinuSwapQuoter";
-import VinuSwapQuoterInfo from "../artifacts/contracts/periphery/VinuSwapQuoter.sol/VinuSwapQuoter.json";
+
+// Hardhat artifact JSONs include bytecode, deployedBytecode, and source maps
+// (~MBs per file) that bloat browser bundles even though only `.abi` is used.
+// These ABI-only JSONs are produced by `npm run build:abis` post-compile.
+import VinuSwapPoolAbi from "./abi/VinuSwapPool.json";
+import SwapRouterAbi from "./abi/SwapRouter.json";
+import NonfungiblePositionManagerAbi from "./abi/NonfungiblePositionManager.json";
+import VinuSwapQuoterAbi from "./abi/VinuSwapQuoter.json";
 
 import ERC20Abi from "./abi/ERC20.json";
 
@@ -110,19 +113,19 @@ class VinuSwap {
   ): Promise<VinuSwap> {
     const router = new ethers.Contract(
       routerAddress,
-      SwapRouterInfo.abi,
+      SwapRouterAbi,
       signerOrProvider
     ) as SwapRouter;
 
     const pool = new ethers.Contract(
       poolAddress,
-      VinuSwapPoolInfo.abi,
+      VinuSwapPoolAbi,
       signerOrProvider
     ) as VinuSwapPool;
 
     const quoter = new ethers.Contract(
       quoterAddress,
-      VinuSwapQuoterInfo.abi,
+      VinuSwapQuoterAbi,
       signerOrProvider
     ) as VinuSwapQuoter;
 
@@ -142,7 +145,7 @@ class VinuSwap {
 
     const positionManager = new ethers.Contract(
       positionManagerAddress,
-      NonfungiblePositionManagerInfo.abi,
+      NonfungiblePositionManagerAbi,
       signerOrProvider
     ) as NonfungiblePositionManager;
 

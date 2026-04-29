@@ -70,12 +70,16 @@ export default{
     },
     allowUnlimitedContractSize: true,
     contractSizer: {
-        runOnCompile: true
+        // Run with `npx hardhat size-contracts` on demand instead of every compile.
+        runOnCompile: false
     },
     networks: {
         hardhat: {
+            // Generating + funding 2000 signers slows hardhat node startup
+            // significantly; the default of 20 is enough for the suite. Set
+            // HARDHAT_ACCOUNTS_COUNT to override for stress tests.
             accounts: {
-                count: 2000
+                count: parseInt(process.env.HARDHAT_ACCOUNTS_COUNT ?? "20", 10)
             }
         },
         vinu: {
