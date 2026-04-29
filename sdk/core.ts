@@ -311,13 +311,15 @@ class VinuSwap {
       this.fee,
       this.tickSpacing,
       async () => {
+        const [uniswapPool, positionRaw] = await Promise.all([
+          this.asUniswapPool(),
+          this.positionManager.positions(nftId),
+        ]);
         const position = new Position({
-          pool: await this.asUniswapPool(),
-          liquidity: (
-            await this.positionManager.positions(nftId)
-          ).liquidity.toString(),
-          tickLower: (await this.positionManager.positions(nftId)).tickLower,
-          tickUpper: (await this.positionManager.positions(nftId)).tickUpper,
+          pool: uniswapPool,
+          liquidity: positionRaw.liquidity.toString(),
+          tickLower: positionRaw.tickLower,
+          tickUpper: positionRaw.tickUpper,
         });
 
         return [
@@ -338,13 +340,15 @@ class VinuSwap {
       this.fee,
       this.tickSpacing,
       async () => {
+        const [uniswapPool, positionRaw] = await Promise.all([
+          this.asUniswapPool(),
+          this.positionManager.positions(nftId),
+        ]);
         const position = new Position({
-          pool: await this.asUniswapPool(),
-          liquidity: (
-            await this.positionManager.positions(nftId)
-          ).liquidity.toString(),
-          tickLower: (await this.positionManager.positions(nftId)).tickLower,
-          tickUpper: (await this.positionManager.positions(nftId)).tickUpper,
+          pool: uniswapPool,
+          liquidity: positionRaw.liquidity.toString(),
+          tickLower: positionRaw.tickLower,
+          tickUpper: positionRaw.tickUpper,
         });
 
         return BigNumber.from(position.amount0.numerator.toString());
@@ -362,13 +366,15 @@ class VinuSwap {
       this.fee,
       this.tickSpacing,
       async () => {
+        const [uniswapPool, positionRaw] = await Promise.all([
+          this.asUniswapPool(),
+          this.positionManager.positions(nftId),
+        ]);
         const position = new Position({
-          pool: await this.asUniswapPool(),
-          liquidity: (
-            await this.positionManager.positions(nftId)
-          ).liquidity.toString(),
-          tickLower: (await this.positionManager.positions(nftId)).tickLower,
-          tickUpper: (await this.positionManager.positions(nftId)).tickUpper,
+          pool: uniswapPool,
+          liquidity: positionRaw.liquidity.toString(),
+          tickLower: positionRaw.tickLower,
+          tickUpper: positionRaw.tickUpper,
         });
 
         return BigNumber.from(position.amount1.numerator.toString());
@@ -845,9 +851,12 @@ class VinuSwap {
       this.fee,
       this.tickSpacing,
       async () => {
-        const oldPositionRaw = await this.positionManager.positions(nftId);
+        const [uniswapPool, oldPositionRaw] = await Promise.all([
+          this.asUniswapPool(),
+          this.positionManager.positions(nftId),
+        ]);
         const oldPosition = new Position({
-          pool: await this.asUniswapPool(),
+          pool: uniswapPool,
           liquidity: oldPositionRaw.liquidity.toString(),
           tickLower: oldPositionRaw.tickLower,
           tickUpper: oldPositionRaw.tickUpper,
@@ -857,7 +866,7 @@ class VinuSwap {
         const amount1 = oldPosition.amount1.numerator.toString();
 
         const newPosition = Position.fromAmounts({
-          pool: await this.asUniswapPool(),
+          pool: uniswapPool,
           tickLower: oldPositionRaw.tickLower,
           tickUpper: oldPositionRaw.tickUpper,
           amount0: BigNumber.from(amount0)
@@ -928,16 +937,19 @@ class VinuSwap {
       this.fee,
       this.tickSpacing,
       async () => {
-        const oldPositionRaw = await this.positionManager.positions(nftId);
+        const [uniswapPool, oldPositionRaw] = await Promise.all([
+          this.asUniswapPool(),
+          this.positionManager.positions(nftId),
+        ]);
         const oldPosition = new Position({
-          pool: await this.asUniswapPool(),
+          pool: uniswapPool,
           liquidity: oldPositionRaw.liquidity.toString(),
           tickLower: oldPositionRaw.tickLower,
           tickUpper: oldPositionRaw.tickUpper,
         });
 
         const newPosition = new Position({
-          pool: await this.asUniswapPool(),
+          pool: uniswapPool,
           liquidity: oldPositionRaw.liquidity.sub(liquidity).toString(),
           tickLower: oldPositionRaw.tickLower,
           tickUpper: oldPositionRaw.tickUpper,

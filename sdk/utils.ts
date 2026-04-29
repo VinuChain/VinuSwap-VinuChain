@@ -22,23 +22,37 @@ function decodePrice(price: BigNumber): string {
     .toString();
 }
 
+// Serializes overrides on the shared @uniswap/v3-sdk TICK_SPACINGS map. Without
+// this, two concurrent SDK calls would race to write/restore the same global
+// entry — the second would observe the first's override and the first would
+// "restore" the wrong baseline.
+let tickSpacingChain: Promise<unknown> = Promise.resolve();
+
 async function withCustomTickSpacing<T>(
   fee: number,
   tickSpacing: number,
   f: (() => Promise<T>) | (() => T)
 ): Promise<T> {
-  // @ts-ignore
-  const old_value = TICK_SPACINGS[fee];
+  const run = tickSpacingChain.then(async () => {
+    // @ts-ignore
+    const old_value = TICK_SPACINGS[fee];
 
-  // @ts-ignore
-  TICK_SPACINGS[fee] = tickSpacing;
+    // @ts-ignore
+    TICK_SPACINGS[fee] = tickSpacing;
 
-  const result = await f();
+    try {
+      return await f();
+    } finally {
+      // @ts-ignore
+      TICK_SPACINGS[fee] = old_value;
+    }
+  });
 
-  // @ts-ignore
-  TICK_SPACINGS[fee] = old_value;
+  // Keep the chain alive even if this call rejects, so subsequent callers
+  // still get serialized against a settled promise instead of a pending one.
+  tickSpacingChain = run.catch(() => undefined);
 
-  return result;
+  return run as Promise<T>;
 }
 
 export { encodePrice, decodePrice, withCustomTickSpacing, FixedMathBN };
