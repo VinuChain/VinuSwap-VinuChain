@@ -23,9 +23,15 @@ struct Position {
 
 When `block.timestamp < lockedUntil`:
 - ❌ `decreaseLiquidity()` - Blocked
-- ❌ `burn()` - Blocked
+- ⚠️ `burn()` - Only possible after liquidity and owed tokens are already zero
 - ✅ `collect()` - Allowed (fees can always be claimed)
 - ✅ `increaseLiquidity()` - Allowed (can add more liquidity)
+
+The lock is enforced in `decreaseLiquidity()`. A locked position with active
+liquidity cannot be burned because it cannot be emptied first, but `burn()`
+itself checks only that liquidity and owed tokens are cleared. This matters for
+frontends: the UI should present the position as locked for liquidity removal,
+while still allowing fee collection and additional liquidity.
 
 ## Locking a Position
 
@@ -132,8 +138,6 @@ async function extendLock(tokenId, newLockUntil) {
 ```javascript
 async function isPositionLocked(tokenId) {
     const position = await positionManager.positions(tokenId);
-    // Note: lockedUntil may need to be retrieved differently
-    // depending on implementation
     return Date.now() / 1000 < position.lockedUntil;
 }
 
@@ -151,6 +155,18 @@ async function getLockDetails(tokenId) {
     };
 }
 ```
+
+## Frontend Behavior
+
+Applications should expose locking directly on the position NFT:
+
+- Read `lockedUntil` from `NonfungiblePositionManager.positions(tokenId)`.
+- Show whether the position is unlocked, expired, or locked until an exact date.
+- Disable liquidity removal while the lock is active.
+- Keep collect-fee and add-liquidity actions available while locked.
+- Only offer lock timestamps that are in the future and later than the current lock.
+
+Locks can only be extended. There is no shortening or unlocking transaction.
 
 ## Collecting Fees While Locked
 

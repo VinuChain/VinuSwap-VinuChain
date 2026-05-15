@@ -149,18 +149,32 @@ const checkQuery = async (methodName : string, params : Array<any>, expected : A
     expect(await referenceContract[methodName](...params)).to.be.deep.equal(parsedExpected)
 }
 
+const nextUser = async () => {
+    const [...allUsers] = await ethers.getSigners()
+    if (mnemonicCounter < allUsers.length) {
+        return allUsers[mnemonicCounter++]
+    }
+
+    const user = ethers.Wallet.createRandom().connect(ethers.provider)
+    mnemonicCounter++
+    await deployer.sendTransaction({
+        to: user.address,
+        value: ethers.utils.parseEther('10')
+    })
+    return user
+}
+
 const newUsers = async (...tokenInfos : Array<Array<Array<String | Number>>>) => {
     const users : Array<any> = []
     for (const tokenInfo of tokenInfos) {
-        const [...allUsers] = await ethers.getSigners()
-        const user = allUsers[mnemonicCounter++]
+        const user = await nextUser()
 
         const currentTokens = [token0Contract, token1Contract]
         const currentContracts = [poolContract, factoryContract]
 
         for (const tokenPair of tokenInfo) {
             const matchingToken = currentTokens.find(x => x.address == tokenPair[0])
-            
+
             await matchingToken.connect(user).mint(String(tokenPair[1]))
 
             for (const currentContract of currentContracts) {
@@ -175,7 +189,9 @@ const newUsers = async (...tokenInfos : Array<Array<Array<String | Number>>>) =>
 }
 
 
-describe.only('test VinuSwapPool', function () {
+describe('test VinuSwapPool', function () {
+    this.timeout(120000)
+
     before(async function() {
         this.timeout(0)
 
@@ -704,6 +720,178 @@ describe.only('test VinuSwapPool', function () {
                 }
 
                 await positionManagerContract.connect(deployer).decreaseLiquidity(decreaseParams)
+            })
+            it('collects accrued swap fees while locked', async function () {
+                const [alice] = await newUsers([[TOKEN_0, 100000]])
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000000,
+                    amount1Desired : 3000000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                const lockedUntil = await time.latest() + 1000
+                await positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() + 1000000)
+
+                await token0Contract.connect(alice).approve(routerContract.address, '100000')
+                await routerContract.connect(alice).exactInputSingle({
+                    tokenIn : TOKEN_0,
+                    tokenOut : TOKEN_1,
+                    fee : FEE,
+                    recipient : alice.address,
+                    deadline : await time.latest() + 1000000,
+                    amountIn : 100000,
+                    amountOutMinimum : 0,
+                    sqrtPriceLimitX96 : 0
+                })
+
+                const quotedOwed = await positionManagerContract.callStatic.quoteTokensOwed(1)
+                const owed0 = quotedOwed[0]
+                const owed1 = quotedOwed[1]
+                expect(owed0.add(owed1).gt(0)).to.eq(true)
+
+                const balance0Before = await token0Contract.balanceOf(deployer.address)
+                const balance1Before = await token1Contract.balanceOf(deployer.address)
+
+                const collectParams = {
+                    tokenId : 1,
+                    recipient : deployer.address,
+                    amount0Max : owed0,
+                    amount1Max : owed1
+                }
+
+                await positionManagerContract.connect(deployer).collect(collectParams)
+
+                const collected0 = (await token0Contract.balanceOf(deployer.address)).sub(balance0Before)
+                const collected1 = (await token1Contract.balanceOf(deployer.address)).sub(balance1Before)
+                expect(collected0.add(collected1).gt(0)).to.eq(true)
+                await checkQuery('tokensOwed', [1], [0, 0], positionManagerContract)
+            })
+            it('does not burn a locked position with active liquidity', async function () {
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                const lockedUntil = await time.latest() + 1000
+                await positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() + 1000000)
+
+                await expect(
+                    positionManagerContract.connect(deployer).burn(1)
+                ).to.be.eventually.rejectedWith('Not cleared')
+            })
+            it('burns a locked position after liquidity and owed tokens are cleared', async function () {
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                await positionManagerContract.connect(deployer).decreaseLiquidity({
+                    tokenId : 1,
+                    liquidity : 1414,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    deadline : await time.latest() + 1000000
+                })
+
+                await positionManagerContract.connect(deployer).collect({
+                    tokenId : 1,
+                    recipient : deployer.address,
+                    amount0Max : 1000,
+                    amount1Max : 2000
+                })
+
+                await checkQuery('tokensOwed', [1], [0, 0], positionManagerContract)
+
+                const lockedUntil = await time.latest() + 1000
+                await positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() + 1000000)
+                expect((await positionManagerContract.positions(1)).lockedUntil).to.eq(lockedUntil)
+
+                await positionManagerContract.connect(deployer).burn(1)
+            })
+            it('increases liquidity while locked', async function () {
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(2)))
+
+                const mintParams = {
+                    token0 : TOKEN_0,
+                    token1 : TOKEN_1,
+                    fee : FEE,
+                    tickLower : -887272,
+                    tickUpper : 887272,
+                    amount0Desired : 1000,
+                    amount1Desired : 3000,
+                    amount0Min : 0,
+                    amount1Min : 0,
+                    recipient : deployer.address,
+                    deadline : await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '1000')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '2000')
+                await positionManagerContract.connect(deployer).mint(mintParams)
+
+                const lockedUntil = await time.latest() + 1000
+                await positionManagerContract.connect(deployer).lock(1, lockedUntil, await time.latest() + 1000000)
+
+                const beforePosition = await positionManagerContract.positions(1)
+                const increaseParams = {
+                    tokenId : 1,
+                    amount0Desired : 50,
+                    amount1Desired : 100,
+                    amount0Min: 0,
+                    amount1Min : 0,
+                    deadline: await time.latest() + 1000000
+                }
+
+                await token0Contract.connect(deployer).approve(positionManagerContract.address, '50')
+                await token1Contract.connect(deployer).approve(positionManagerContract.address, '100')
+                await positionManagerContract.connect(deployer).increaseLiquidity(increaseParams)
+
+                const afterPosition = await positionManagerContract.positions(1)
+                expect(afterPosition.liquidity.gt(beforePosition.liquidity)).to.eq(true)
             })
             it('fails to lock a non-existent token', async function () {
                 await expect(

@@ -47,6 +47,18 @@ Computes the pool address for the given factory and pool key.
 
 **Note:** Requires the correct `POOL_INIT_CODE_HASH` constant.
 
+## Deployment Note
+
+`POOL_INIT_CODE_HASH` is compiled into periphery contracts that compute pool
+addresses, including routers, quoters, position managers, and descriptors.
+Updating the source constant affects future periphery deployments and source
+provenance only. Existing deployed contracts keep the hash they were compiled
+with until those periphery contracts are redeployed.
+
+Do not update deployed-address documentation or registry addresses for this
+hash alone. Update those records only when a new periphery deployment is
+actually made.
+
 ## JavaScript Implementation
 
 ```javascript
