@@ -1,3 +1,4 @@
+const fs = require("fs")
 require("@nomiclabs/hardhat-ethers")
 require('solidity-docgen');
 import { HardhatUserConfig } from "hardhat/config";
@@ -6,6 +7,58 @@ import "hardhat-tracer"
 import "@nomicfoundation/hardhat-toolbox"
 
 import "hardhat-contract-sizer"
+
+function loadLocalEnv(path: string = ".env") {
+    if (!fs.existsSync(path)) {
+        return
+    }
+
+    for (const line of fs.readFileSync(path, "utf8").split(/\r?\n/)) {
+        const trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith("#")) {
+            continue
+        }
+
+        const separator = trimmed.indexOf("=")
+        if (separator === -1) {
+            continue
+        }
+
+        const key = trimmed.slice(0, separator).trim()
+        let value = trimmed.slice(separator + 1).trim()
+        if (!key || process.env[key] !== undefined) {
+            continue
+        }
+
+        if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+        ) {
+            value = value.slice(1, -1)
+        }
+
+        process.env[key] = value
+    }
+}
+
+function normalizePrivateKey(value?: string) {
+    if (!value) {
+        return undefined
+    }
+
+    const trimmed = value.trim()
+    if (!trimmed) {
+        return undefined
+    }
+
+    return trimmed.startsWith("0x") ? trimmed : `0x${trimmed}`
+}
+
+loadLocalEnv()
+
+const vinuOwnerPrivateKey = normalizePrivateKey(
+    process.env.VINUSWAP_OWNER_PRIVATE_KEY || process.env.PRIVATE_KEY
+)
 
 export default{
     defaultNetwork: "hardhat",
@@ -83,9 +136,8 @@ export default{
             }
         },
         vinu: {
-            url: "https://vinuchain-rpc.com",
-            accounts: [
-            ]
+            url: process.env.VINUSWAP_RPC_URL || "https://vinuchain-rpc.com",
+            accounts: vinuOwnerPrivateKey ? [vinuOwnerPrivateKey] : []
         }
     }
 }

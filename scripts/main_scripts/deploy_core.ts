@@ -74,7 +74,11 @@ async function deployCommonContracts(accounts, shares, discountToken, discountTh
     )
     console.log('Deployed tiered discount to:', tieredDiscountContract.address)
 
-    // 8. Deploy VinuSwapQuoter
+    // 8. Make standard pool creation discount-enabled by default.
+    await controllerContract.connect(deployer).setDefaultFeeManager(factoryContract.address, tieredDiscountContract.address)
+    console.log('Set default fee manager to tiered discount for factory:', factoryContract.address)
+
+    // 9. Deploy VinuSwapQuoter
     const quoterBlueprint = await ethers.getContractFactory('VinuSwapQuoter')
     const quoterContract = await quoterBlueprint.deploy(factoryContract.address, WETH)
 
