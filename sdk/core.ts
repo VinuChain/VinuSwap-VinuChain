@@ -23,6 +23,15 @@ import { Percent } from "@uniswap/sdk-core/dist";
 import { TickMath, nearestUsableTick, Position, Pool } from "@uniswap/v3-sdk";
 import JSBI from "jsbi";
 
+function normalizeAddress(address: string): string {
+  return ethers.utils.getAddress(address);
+}
+
+function addressMatches(address: string, candidates: string[]): boolean {
+  const normalized = normalizeAddress(address);
+  return candidates.some((candidate) => normalized === normalizeAddress(candidate));
+}
+
 class VinuSwap {
   public pool: VinuSwapPool;
   public quoter: VinuSwapQuoter;
@@ -132,10 +141,12 @@ class VinuSwap {
       pool.tickSpacing(),
     ]);
 
-    if (tokenA != token0Address && tokenA != token1Address) {
+    const poolTokenAddresses = [token0Address, token1Address];
+
+    if (!addressMatches(tokenA, poolTokenAddresses)) {
       throw new Error("TokenA address does not match");
     }
-    if (tokenB != token0Address && tokenB != token1Address) {
+    if (!addressMatches(tokenB, poolTokenAddresses)) {
       throw new Error("TokenB address does not match");
     }
 
@@ -289,6 +300,27 @@ class VinuSwap {
     return await withCustomTickSpacing(this.fee, this.tickSpacing, () =>
       this.buildUniswapPool(state)
     );
+  }
+
+  private validateSwapTokens(tokenIn: string, tokenOut: string): [string, string] {
+    const normalizedTokenIn = normalizeAddress(tokenIn);
+    const normalizedTokenOut = normalizeAddress(tokenOut);
+    const poolTokenAddresses = [
+      normalizeAddress(this.token0Contract.address),
+      normalizeAddress(this.token1Contract.address),
+    ];
+
+    if (!poolTokenAddresses.includes(normalizedTokenIn)) {
+      throw new Error("TokenIn address does not match");
+    }
+    if (!poolTokenAddresses.includes(normalizedTokenOut)) {
+      throw new Error("TokenOut address does not match");
+    }
+    if (normalizedTokenIn === normalizedTokenOut) {
+      throw new Error("TokenIn and TokenOut addresses are the same");
+    }
+
+    return [normalizedTokenIn, normalizedTokenOut];
   }
 
   // Fetches everything needed to build a Position for `nftId` in parallel,
@@ -478,20 +510,20 @@ class VinuSwap {
     }
 
     const poolState = await this.fetchPoolState();
-    const pool = await withCustomTickSpacing(this.fee, this.tickSpacing, () =>
-      this.buildUniswapPool(poolState)
-    );
-    const position = Position.fromAmounts({
-      pool,
-      tickLower,
-      tickUpper,
-      amount0: amount0Desired.toString(),
-      amount1: amount1Desired.toString(),
-      useFullPrecision: true,
+    const slippageBounds = await withCustomTickSpacing(this.fee, this.tickSpacing, () => {
+      const pool = this.buildUniswapPool(poolState);
+      const position = Position.fromAmounts({
+        pool,
+        tickLower,
+        tickUpper,
+        amount0: amount0Desired.toString(),
+        amount1: amount1Desired.toString(),
+        useFullPrecision: true,
+      });
+      return position.mintAmountsWithSlippage(
+        new Percent(Math.floor(slippageRatio * 10_000), 10_000)
+      );
     });
-    const slippageBounds = position.mintAmountsWithSlippage(
-      new Percent(Math.floor(slippageRatio * 10_000), 10_000)
-    );
 
     const tx = await this.positionManager.mint(
       {
@@ -544,16 +576,16 @@ class VinuSwap {
     }
 
     const poolState = await this.fetchPoolState();
-    const pool = await withCustomTickSpacing(this.fee, this.tickSpacing, () =>
-      this.buildUniswapPool(poolState)
-    );
-    const position = Position.fromAmounts({
-      pool,
-      tickLower,
-      tickUpper,
-      amount0: amount0Desired.toString(),
-      amount1: amount1Desired.toString(),
-      useFullPrecision: true,
+    const position = await withCustomTickSpacing(this.fee, this.tickSpacing, () => {
+      const pool = this.buildUniswapPool(poolState);
+      return Position.fromAmounts({
+        pool,
+        tickLower,
+        tickUpper,
+        amount0: amount0Desired.toString(),
+        amount1: amount1Desired.toString(),
+        useFullPrecision: true,
+      });
     });
 
     return [
@@ -574,25 +606,11 @@ class VinuSwap {
     tokenOut: string,
     amountIn: BigNumberish
   ) {
-    if (
-      tokenIn != this.token0Contract.address &&
-      tokenIn != this.token1Contract.address
-    ) {
-      throw new Error("TokenIn address does not match");
-    }
-    if (
-      tokenOut != this.token0Contract.address &&
-      tokenOut != this.token1Contract.address
-    ) {
-      throw new Error("TokenOut address does not match");
-    }
-    if (tokenIn == tokenOut) {
-      throw new Error("TokenIn and TokenOut addresses are the same");
-    }
+    const [normalizedTokenIn, normalizedTokenOut] = this.validateSwapTokens(tokenIn, tokenOut);
 
     const quote = await this.quoter.callStatic.quoteExactInputSingle({
-      tokenIn: tokenIn,
-      tokenOut: tokenOut,
+      tokenIn: normalizedTokenIn,
+      tokenOut: normalizedTokenOut,
       fee: this.fee,
       amountIn,
       sqrtPriceLimitX96: 0,
@@ -619,25 +637,11 @@ class VinuSwap {
     recipient: string,
     deadline: Date
   ): Promise<ethers.ContractTransaction> {
-    if (
-      tokenIn != this.token0Contract.address &&
-      tokenIn != this.token1Contract.address
-    ) {
-      throw new Error("TokenIn address does not match");
-    }
-    if (
-      tokenOut != this.token0Contract.address &&
-      tokenOut != this.token1Contract.address
-    ) {
-      throw new Error("TokenOut address does not match");
-    }
-    if (tokenIn == tokenOut) {
-      throw new Error("TokenIn and TokenOut addresses are the same");
-    }
+    const [normalizedTokenIn, normalizedTokenOut] = this.validateSwapTokens(tokenIn, tokenOut);
 
     const tx = await this.router.exactInputSingle({
-      tokenIn: tokenIn,
-      tokenOut: tokenOut,
+      tokenIn: normalizedTokenIn,
+      tokenOut: normalizedTokenOut,
       fee: this.fee,
       amountIn,
       amountOutMinimum,
@@ -660,25 +664,11 @@ class VinuSwap {
     tokenOut: string,
     amountOut: BigNumberish
   ) {
-    if (
-      tokenIn != this.token0Contract.address &&
-      tokenIn != this.token1Contract.address
-    ) {
-      throw new Error("TokenIn address does not match");
-    }
-    if (
-      tokenOut != this.token0Contract.address &&
-      tokenOut != this.token1Contract.address
-    ) {
-      throw new Error("TokenOut address does not match");
-    }
-    if (tokenIn == tokenOut) {
-      throw new Error("TokenIn and TokenOut addresses are the same");
-    }
+    const [normalizedTokenIn, normalizedTokenOut] = this.validateSwapTokens(tokenIn, tokenOut);
 
     const quote = await this.quoter.callStatic.quoteExactOutputSingle({
-      tokenIn: tokenIn,
-      tokenOut: tokenOut,
+      tokenIn: normalizedTokenIn,
+      tokenOut: normalizedTokenOut,
       fee: this.fee,
       amount: amountOut, // Note that the nomenclature is different here compared to quoteExactInput
       sqrtPriceLimitX96: 0,
@@ -705,25 +695,11 @@ class VinuSwap {
     recipient: string,
     deadline: Date
   ): Promise<ethers.ContractTransaction> {
-    if (
-      tokenIn != this.token0Contract.address &&
-      tokenIn != this.token1Contract.address
-    ) {
-      throw new Error("TokenIn address does not match");
-    }
-    if (
-      tokenOut != this.token0Contract.address &&
-      tokenOut != this.token1Contract.address
-    ) {
-      throw new Error("TokenOut address does not match");
-    }
-    if (tokenIn == tokenOut) {
-      throw new Error("TokenIn and TokenOut addresses are the same");
-    }
+    const [normalizedTokenIn, normalizedTokenOut] = this.validateSwapTokens(tokenIn, tokenOut);
 
     const tx = await this.router.exactOutputSingle({
-      tokenIn: tokenIn,
-      tokenOut: tokenOut,
+      tokenIn: normalizedTokenIn,
+      tokenOut: normalizedTokenOut,
       fee: this.fee,
       amountOut,
       amountInMaximum,
@@ -837,18 +813,20 @@ class VinuSwap {
     const amount0 = oldPosition.amount0.numerator.toString();
     const amount1 = oldPosition.amount1.numerator.toString();
 
-    const newPosition = Position.fromAmounts({
-      pool,
-      tickLower: raw.tickLower,
-      tickUpper: raw.tickUpper,
-      amount0: BigNumber.from(amount0)
-        .add(BigNumber.from(amount0Desired))
-        .toString(),
-      amount1: BigNumber.from(amount1)
-        .add(BigNumber.from(amount1Desired))
-        .toString(),
-      useFullPrecision: true,
-    });
+    const newPosition = await withCustomTickSpacing(this.fee, this.tickSpacing, () =>
+      Position.fromAmounts({
+        pool,
+        tickLower: raw.tickLower,
+        tickUpper: raw.tickUpper,
+        amount0: BigNumber.from(amount0)
+          .add(BigNumber.from(amount0Desired))
+          .toString(),
+        amount1: BigNumber.from(amount1)
+          .add(BigNumber.from(amount1Desired))
+          .toString(),
+        useFullPrecision: true,
+      })
+    );
 
     return [
       BigNumber.from(
@@ -900,12 +878,14 @@ class VinuSwap {
     liquidity: BigNumberish
   ): Promise<[BigNumber, BigNumber]> {
     const { pool, position: oldPosition, raw } = await this.loadPosition(nftId);
-    const newPosition = new Position({
-      pool,
-      liquidity: raw.liquidity.sub(liquidity).toString(),
-      tickLower: raw.tickLower,
-      tickUpper: raw.tickUpper,
-    });
+    const newPosition = await withCustomTickSpacing(this.fee, this.tickSpacing, () =>
+      new Position({
+        pool,
+        liquidity: raw.liquidity.sub(liquidity).toString(),
+        tickLower: raw.tickLower,
+        tickUpper: raw.tickUpper,
+      })
+    );
 
     return [
       BigNumber.from(

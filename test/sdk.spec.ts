@@ -228,7 +228,7 @@ describe('test SDK', function () {
                 await poolContract.initialize(encodePriceSqrt(BigNumber.from(342)))
                 await poolContract.setFeeProtocol(4, 4)
                 // TOKEN_0 and TOKEN_1 are swapped
-                const sdk = await VinuSwap.create(TOKEN_1, TOKEN_0, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+                const sdk = await VinuSwap.create(TOKEN_1.toLowerCase(), TOKEN_0.toLowerCase(), poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                 expect(sdk.token0Address).to.be.equal(TOKEN_0)
                 expect(sdk.token1Address).to.be.equal(TOKEN_1)
                 expect(await sdk.factory()).to.be.equal(factoryContract.address)
@@ -378,6 +378,12 @@ describe('test SDK', function () {
 
                 describe('swap', function() {
                     describe('swapExactInput', function() {
+                        it('quotes exact input swaps with lower-case token addresses', async function() {
+                            const amountOut = await sdk.connect(alice).quoteExactInput(TOKEN_0.toLowerCase(), TOKEN_1.toLowerCase(), MONE.div(10).toString())
+
+                            expect(amountOut).to.be.equal('91266728437306413')
+                        })
+
                         it('peforms a zero-one exact input swap', async function() {
                             await token0Contract.connect(alice).mint(MONE.div(10))
                             await token0Contract.connect(alice).approve(routerContract.address, MONE.div(10))

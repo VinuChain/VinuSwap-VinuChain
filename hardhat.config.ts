@@ -129,10 +129,10 @@ export default{
     networks: {
         hardhat: {
             // Generating + funding 2000 signers slows hardhat node startup
-            // significantly; the default of 20 is enough for the suite. Set
+            // significantly; 80 covers the SDK suite's unique signer helper. Set
             // HARDHAT_ACCOUNTS_COUNT to override for stress tests.
             accounts: {
-                count: parseInt(process.env.HARDHAT_ACCOUNTS_COUNT ?? "20", 10)
+                count: parseInt(process.env.HARDHAT_ACCOUNTS_COUNT ?? "80", 10)
             }
         },
         vinu: {
