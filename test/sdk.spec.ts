@@ -240,6 +240,15 @@ describe('test SDK', function () {
                 expect(parseFloat((await sdk.price()))).to.be.approximately(342, 0.00000000001)
             })
 
+            it('rejects creation with the same token address twice', async function() {
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(342)))
+                await poolContract.setFeeProtocol(4, 4)
+
+                await expect(
+                    VinuSwap.create(TOKEN_0.toLowerCase(), TOKEN_0, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+                ).to.be.rejectedWith('TokenA and TokenB addresses are the same')
+            })
+
             it('Position getters', async function() {
                 await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
                 await poolContract.setFeeProtocol(4, 4)

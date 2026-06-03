@@ -149,6 +149,9 @@ class VinuSwap {
     if (!addressMatches(tokenB, poolTokenAddresses)) {
       throw new Error("TokenB address does not match");
     }
+    if (normalizeAddress(tokenA) === normalizeAddress(tokenB)) {
+      throw new Error("TokenA and TokenB addresses are the same");
+    }
 
     const positionManager = new ethers.Contract(
       positionManagerAddress,
