@@ -65,8 +65,7 @@ async function removeFeeAccount(
 ### TieredDiscount Settings
 
 ```typescript
-async function configureTieredDiscount(tieredDiscount: Contract) {
-    // Update thresholds
+async function configureTieredDiscount(tieredDiscount: Contract, discountTokenAddress: string) {
     const newThresholds = [
         ethers.utils.parseEther('500'),     // Lower entry
         ethers.utils.parseEther('5000'),
@@ -74,11 +73,8 @@ async function configureTieredDiscount(tieredDiscount: Contract) {
         ethers.utils.parseEther('500000')
     ];
 
-    await tieredDiscount.setThresholds(newThresholds);
-
-    // Update discount rates
     const newDiscounts = [150, 300, 450, 600]; // 1.5%, 3%, 4.5%, 6%
-    await tieredDiscount.setDiscounts(newDiscounts);
+    await tieredDiscount.updateInfo(discountTokenAddress, newThresholds, newDiscounts);
 
     console.log('TieredDiscount configured');
 }
@@ -92,7 +88,7 @@ async function configureOverridableFeeManager(
     pools: Array<{ pool: string, feeManager: string }>
 ) {
     for (const { pool, feeManager } of pools) {
-        await overridable.setOverride(pool, feeManager);
+        await overridable.setFeeManagerOverride(pool, feeManager);
         console.log(`Pool ${pool} using ${feeManager}`);
     }
 }
@@ -238,11 +234,11 @@ async function verifyConfiguration(addresses: {
 
     // Controller
     console.log('\nController:');
-    console.log('  Factory:', await controller.factory());
+    console.log('  Owner:', await controller.owner());
 
     // TieredDiscount
     console.log('\nTieredDiscount:');
-    console.log('  Discount Token:', await tieredDiscount.discountToken());
+    console.log('  Discount Token:', await tieredDiscount.token());
     for (let i = 0; i < 4; i++) {
         const threshold = await tieredDiscount.thresholds(i);
         const discount = await tieredDiscount.discounts(i);

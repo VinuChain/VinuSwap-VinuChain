@@ -304,7 +304,7 @@ Allows per-pool fee manager customization while maintaining a default.
 | VinuSwapFactory | createPool, setOwner |
 | VinuSwapPool | setFeeProtocol, collectProtocol (factory owner) |
 | Controller | createPool, setFeeProtocol, collectProtocolFees |
-| TieredDiscount | setThresholds, setDiscounts |
+| TieredDiscount | updateInfo |
 
 ### Protection Mechanisms
 

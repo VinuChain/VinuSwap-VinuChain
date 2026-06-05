@@ -297,7 +297,7 @@ const overridable = await OverridableFeeManager.deploy(
 );
 
 // Override specific pools with NoDiscount
-await overridable.setOverride(stablePool, noDiscount.address);
+await overridable.setFeeManagerOverride(stablePool, noDiscount.address);
 ```
 
 ## Security Considerations
