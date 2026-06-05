@@ -216,14 +216,16 @@ class VinuSwap {
    * A floating point number representing the share of the token0 protocol fees that go to the protocol.
    */
   public async protocolShare0(): Promise<number> {
-    return 1 / ((await this.pool.slot0()).feeProtocol % 16);
+    const feeProtocol0 = (await this.pool.slot0()).feeProtocol % 16;
+    return feeProtocol0 === 0 ? 0 : 1 / feeProtocol0;
   }
 
   /**
    * A floating point number representing the share of the token1 protocol fees that go to the protocol.
    */
   public async protocolShare1(): Promise<number> {
-    return 1 / ((await this.pool.slot0()).feeProtocol >> 4);
+    const feeProtocol1 = (await this.pool.slot0()).feeProtocol >> 4;
+    return feeProtocol1 === 0 ? 0 : 1 / feeProtocol1;
   }
 
   /**

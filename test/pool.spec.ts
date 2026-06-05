@@ -2396,6 +2396,12 @@ describe('test VinuSwapPool', function () {
             ).to.be.rejectedWith('Discounts must not be higher than 100%')
         })
 
+        it('fails to deploy a tiered fee manager with the zero address token', async function () {
+            await expect(
+                tieredDiscountBlueprint.deploy(ZERO_ADDRESS, [100], [1000])
+            ).to.be.rejectedWith('Token must not be the zero address')
+        })
+
         describe('updating info', function () {
             it('correctly updates fee tiers', async function () {
                 const discountTokenContract = await erc20Blueprint.deploy()
@@ -2548,6 +2554,24 @@ describe('test VinuSwapPool', function () {
                         [10001]
                     )
                 ).to.be.rejectedWith('Discounts must not be higher than 100%')
+            })
+
+            it('fails to update fee tiers with the zero address token', async function () {
+                const discountTokenContract = await erc20Blueprint.deploy()
+
+                const tieredDiscountContract = await tieredDiscountBlueprint.deploy(
+                    discountTokenContract.address,
+                    [40],
+                    [430]
+                )
+
+                await expect(
+                    tieredDiscountContract.connect(deployer).updateInfo(
+                        ZERO_ADDRESS,
+                        [100],
+                        [1000]
+                    )
+                ).to.be.rejectedWith('Token must not be the zero address')
             })
         })
 

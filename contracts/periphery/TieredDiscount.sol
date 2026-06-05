@@ -29,6 +29,7 @@ contract TieredDiscount is IFeeManager, Ownable {
     /// @param _thresholds The thresholds for the discounts
     /// @param _discounts The discounts for the thresholds (in bips)
     function updateInfo(address _token, uint256[] memory _thresholds, uint16[] memory _discounts) public onlyOwner() {
+        require(_token != address(0), "Token must not be the zero address");
         require(_thresholds.length > 0, "Thresholds must not be empty");
         require(_thresholds.length == _discounts.length, "Thresholds and discounts must have the same length");
 

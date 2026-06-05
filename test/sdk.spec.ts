@@ -249,6 +249,14 @@ describe('test SDK', function () {
                 ).to.be.rejectedWith('TokenA and TokenB addresses are the same')
             })
 
+            it('reports zero protocol shares when protocol fees are disabled', async function() {
+                await poolContract.initialize(encodePriceSqrt(BigNumber.from(342)))
+
+                const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+                expect(await sdk.protocolShare0()).to.be.equal(0)
+                expect(await sdk.protocolShare1()).to.be.equal(0)
+            })
+
             it('Position getters', async function() {
                 await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
                 await poolContract.setFeeProtocol(4, 4)
