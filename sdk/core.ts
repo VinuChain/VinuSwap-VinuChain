@@ -32,6 +32,12 @@ function addressMatches(address: string, candidates: string[]): boolean {
   return candidates.some((candidate) => normalized === normalizeAddress(candidate));
 }
 
+function validateSlippageRatio(slippageRatio: number): void {
+  if (!Number.isFinite(slippageRatio) || slippageRatio < 0 || slippageRatio > 1) {
+    throw new Error("slippageRatio must be a finite number between 0 and 1");
+  }
+}
+
 class VinuSwap {
   public pool: VinuSwapPool;
   public quoter: VinuSwapQuoter;
@@ -497,6 +503,8 @@ class VinuSwap {
     recipient: string,
     deadline: Date
   ): Promise<ethers.ContractTransaction> {
+    validateSlippageRatio(slippageRatio);
+
     const sqrtRatioX96Lower = encodePrice(ratioLower.toString());
     const sqrtRatioX96Upper = encodePrice(ratioUpper.toString());
 

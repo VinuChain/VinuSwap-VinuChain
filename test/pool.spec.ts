@@ -1357,8 +1357,16 @@ describe('test VinuSwapPool', function () {
                 it('creates a pool', async function () {
                     await factoryContract.setOwner(controllerContract.address)
 
-                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, (await noDiscountBlueprint.deploy()).address, encodePriceSqrt(BigNumber.from(2)).toString())
+                    const feeManager = (await noDiscountBlueprint.deploy()).address
+                    const sqrtPriceX96 = encodePriceSqrt(BigNumber.from(2)).toString()
+                    const staticPoolAddress = await controllerContract.connect(dan).callStatic.createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, feeManager, sqrtPriceX96)
+
+                    expect(staticPoolAddress).to.not.equal(ZERO_ADDRESS)
+
+                    const tx = await controllerContract.connect(dan).createPool(factoryContract.address, TOKEN_0, TOKEN_1, 100000, 1, feeManager, sqrtPriceX96)
                     const contractAddress = (await tx.wait()).events[2].args.pool
+
+                    expect(staticPoolAddress).to.equal(contractAddress)
 
                     poolContract = poolContractBlueprint.attach(contractAddress)
                     

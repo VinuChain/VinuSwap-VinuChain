@@ -158,7 +158,7 @@ contract Controller is Ownable, ReentrancyGuard {
         address feeManager,
         uint160 sqrtPriceX96
     ) external onlyOwner nonReentrant returns (address pool) {
-        _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager, sqrtPriceX96);
+        pool = _createPoolInternal(factory, tokenA, tokenB, fee, tickSpacing, feeManager, sqrtPriceX96);
     }
 
     /// @notice Sets the default fee manager for a factory for standard pool creation

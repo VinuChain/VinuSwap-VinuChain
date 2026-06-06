@@ -296,6 +296,19 @@ describe('test SDK', function () {
 
         describe('methods', function() {
             describe('mint', function() {
+                it('rejects invalid slippage ratios', async function() {
+                    await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
+
+                    const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
+                    const users = await newUsers([])
+
+                    for (const slippageRatio of [-0.01, 1.01, Number.NaN]) {
+                        await expect(
+                            sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), slippageRatio, users[0].address, new Date(Date.now() + 1000000))
+                        ).to.be.rejectedWith('slippageRatio must be a finite number between 0 and 1')
+                    }
+                })
+
                 it('mints a position', async function() {
                     await poolContract.initialize(encodePriceSqrt(BigNumber.from(1)))
                     await poolContract.setFeeProtocol(4, 4)
