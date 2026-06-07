@@ -10,10 +10,10 @@ VinuSwap defines numerous interfaces for contract interaction.
 | `IVinuSwapPool` | Composite pool interface |
 | `IVinuSwapPoolActions` | Pool action functions |
 | `IVinuSwapPoolEvents` | Pool events |
-| `IVinuSwapPoolDerivedState` | Pool computed state |
-| `IVinuSwapPoolImmutables` | Pool immutable values |
-| `IVinuSwapPoolOwnerActions` | Owner-only functions |
-| `IVinuSwapPoolState` | Pool state variables |
+| `IUniswapV3PoolDerivedState` | Pool computed state |
+| `IUniswapV3PoolImmutables` | Pool immutable values |
+| `IUniswapV3PoolOwnerActions` | Owner-only functions |
+| `IUniswapV3PoolState` | Pool state variables |
 | `IVinuSwapExtraPoolOwnerActions` | Initialize function |
 | `IVinuSwapPoolDeployer` | Deployer interface |
 | `IFeeManager` | Dynamic fee computation |
@@ -25,7 +25,9 @@ VinuSwap defines numerous interfaces for contract interaction.
 | `ISwapRouter` | Swap execution |
 | `INonfungiblePositionManager` | Position NFT management |
 | `INonfungibleTokenPositionDescriptor` | NFT metadata |
+| `IQuoter` | V1-compatible swap quoting |
 | `IQuoterV2` | Swap quoting |
+| `IVinuSwapQuoter` | VinuSwap-specific quoter interface |
 | `IPeripheryPayments` | Token payments |
 | `IPeripheryPaymentsWithFee` | Payments with fee |
 | `IPeripheryImmutableState` | Immutable state |
@@ -81,8 +83,6 @@ interface IVinuSwapFactory {
 
 ```solidity
 interface IVinuSwapPoolActions {
-    function initialize(uint160 sqrtPriceX96) external;
-
     function mint(
         address recipient,
         int24 tickLower,

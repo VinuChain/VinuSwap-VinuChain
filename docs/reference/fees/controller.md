@@ -269,8 +269,8 @@ Collects protocol fees from a pool and distributes to accounts.
 
 ```solidity
 for (uint i = 0; i < accounts.length; i++) {
-    _balances[accounts[i]][token0] += amount0 * shares[accounts[i]] / totalShares;
-    _balances[accounts[i]][token1] += amount1 * shares[accounts[i]] / totalShares;
+    _balances[accounts[i]][token0] = _balances[accounts[i]][token0].add(amount0.mul(shares[accounts[i]]).div(totalShares));
+    _balances[accounts[i]][token1] = _balances[accounts[i]][token1].add(amount1.mul(shares[accounts[i]]).div(totalShares));
 }
 // Dust (rounding remainder) goes to first account
 ```
@@ -391,8 +391,9 @@ const controller = await Controller.deploy(
 // Transfer factory ownership to controller
 await factory.setOwner(controller.address);
 
-// Set up defaults for standard pool creation
-await controller.setDefaultFeeManager(factory.address, tieredDiscount.address);
+// Set up fee-manager chain: Controller default → OverridableFeeManager → TieredDiscount
+await controller.setDefaultFeeManager(factory.address, overridable.address);
+await overridable.setDefaultFeeManager(tieredDiscount.address);
 await controller.setDefaultTickSpacing(factory.address, 3000, 60);  // 0.3% fee → 60 tick spacing
 await controller.setDefaultTickSpacing(factory.address, 500, 10);   // 0.05% fee → 10 tick spacing
 ```

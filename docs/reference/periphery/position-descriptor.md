@@ -146,7 +146,7 @@ The descriptor attempts to resolve token symbols:
 
 ```solidity
 function tokenSymbol(address token) private view returns (string memory) {
-    if (token == WVC) {
+    if (token == WETH9) {
         return nativeCurrencyLabelBytes;  // e.g., "VC"
     }
 
@@ -168,14 +168,14 @@ function tokenSymbol(address token) private view returns (string memory) {
 
 ```solidity
 constructor(
-    address _WVC,
+    address _WETH9,
     bytes32 _nativeCurrencyLabelBytes
 )
 ```
 
 | Parameter | Description |
 |-----------|-------------|
-| `_WVC` | Wrapped native currency address |
+| `_WETH9` | Wrapped native currency address |
 | `_nativeCurrencyLabelBytes` | Native currency symbol (e.g., "VC") |
 
 ## Integration

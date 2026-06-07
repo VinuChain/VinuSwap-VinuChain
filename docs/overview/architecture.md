@@ -21,12 +21,12 @@ VinuSwap follows a layered architecture separating core AMM logic from user-faci
 │  │ - multi-hop     │  │ - collect/lock        │  │                 │   │
 │  └─────────────────┘  └───────────────────────┘  └─────────────────┘   │
 │                                                                         │
-│  ┌─────────────────┐  ┌───────────────────────┐                        │
-│  │  Controller     │  │ PositionDescriptor    │                        │
-│  │ - createPool    │  │ - tokenURI            │                        │
-│  │ - collectFees   │  │ - SVG generation      │                        │
-│  │ - distribute    │  │                       │                        │
-│  └─────────────────┘  └───────────────────────┘                        │
+│  ┌──────────────────────┐  ┌───────────────────────┐                   │
+│  │  Controller          │  │ PositionDescriptor    │                   │
+│  │ - createPool         │  │ - tokenURI            │                   │
+│  │ - collectProtocolFees│  │ - SVG generation      │                   │
+│  │ - distribute         │  │                       │                   │
+│  └──────────────────────┘  └───────────────────────┘                   │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -188,11 +188,16 @@ Called during swap execution to potentially modify the fee.
 
 Reduces fees based on user's token balance:
 
+> **Example configuration (owner-configurable at deploy time).** Tiers are set as
+> owner-configurable arrays when the contract is deployed; the values below reflect
+> the example values in `scripts/deploy.ts` and are not fixed protocol constants.
+
 ```
 Balance >= 1,000,000 tokens → 4% discount
 Balance >= 100,000 tokens  → 3% discount
 Balance >= 10,000 tokens   → 2% discount
 Balance >= 1,000 tokens    → 1% discount
+Below 1,000 tokens         → no discount
 ```
 
 ### OverridableFeeManager

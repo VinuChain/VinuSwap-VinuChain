@@ -93,7 +93,7 @@ const amountOut = await router.exactInputSingle(params);
 ### exactInput
 
 ```solidity
-function exactInput(ExactInputParams calldata params)
+function exactInput(ExactInputParams memory params)
     external
     payable
     override
@@ -277,10 +277,10 @@ Callback from pool during swap. Handles payment of input tokens.
 
 ## Payment Functions
 
-### unwrapWVC
+### unwrapWETH9
 
 ```solidity
-function unwrapWVC(uint256 amountMinimum, address recipient) external payable
+function unwrapWETH9(uint256 amountMinimum, address recipient) public payable
 ```
 
 Unwraps WVC to VC.
@@ -321,7 +321,7 @@ Executes multiple router calls in a single transaction.
 // Swap and unwrap in one transaction
 const calls = [
     router.interface.encodeFunctionData('exactInputSingle', [swapParams]),
-    router.interface.encodeFunctionData('unwrapWVC', [minAmount, recipient])
+    router.interface.encodeFunctionData('unwrapWETH9', [minAmount, recipient])
 ];
 
 await router.multicall(calls);
@@ -397,7 +397,7 @@ const params = {
 // Use multicall to swap and unwrap
 const calls = [
     router.interface.encodeFunctionData('exactInputSingle', [params]),
-    router.interface.encodeFunctionData('unwrapWVC', [
+    router.interface.encodeFunctionData('unwrapWETH9', [
         ethers.utils.parseEther('100'),  // Minimum VC
         userAddress                       // Actual recipient
     ])

@@ -56,6 +56,12 @@ positionManager: NonfungiblePositionManager // Position manager contract
 token0Contract: ethers.Contract // Token0 ERC20 contract
 token1Contract: ethers.Contract // Token1 ERC20 contract
 signerOrProvider: Signer | Provider // Connected signer or provider
+
+// Immutable pool/token data (fetched once in create())
+fee: number             // Pool fee in bips
+tickSpacing: number     // Pool tick spacing
+token0Decimals: number  // Token0 decimals
+token1Decimals: number  // Token1 decimals
 ```
 
 ### Token Addresses (Getters)
@@ -345,7 +351,7 @@ async mint(
 | `ratioUpper` | `number` | Upper price ratio (token1/token0) |
 | `amount0Desired` | `BigNumberish` | Desired token0 amount |
 | `amount1Desired` | `BigNumberish` | Desired token1 amount |
-| `slippageRatio` | `number` | Slippage tolerance (0-1, e.g., 0.005 for 0.5%) |
+| `slippageRatio` | `number` | Slippage tolerance. Must be a finite number in [0, 1] (e.g., 0.005 = 0.5%). Throws `"slippageRatio must be a finite number between 0 and 1"` if out of range or non-finite. |
 | `recipient` | `string` | NFT recipient address |
 | `deadline` | `Date` | Transaction deadline |
 

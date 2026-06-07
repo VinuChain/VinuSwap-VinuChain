@@ -65,7 +65,7 @@ actually made.
 const { ethers } = require('ethers');
 
 // Get this from PoolInitHelper contract
-const POOL_INIT_CODE_HASH = '0x...';
+const POOL_INIT_CODE_HASH = '0x4fbe579c12ff49f3db19ca7f7ffa97db7e386da9f10833152cca6b821b2b744c'; // PoolAddress.sol:6
 
 function computePoolAddress(factory, tokenA, tokenB, fee) {
     // Sort tokens

@@ -256,7 +256,7 @@ function swap(
     int256 amountSpecified,
     uint160 sqrtPriceLimitX96,
     bytes calldata data
-) external override lock returns (int256 amount0, int256 amount1)
+) external override noDelegateCall returns (int256 amount0, int256 amount1)
 ```
 
 Executes a swap.
@@ -300,6 +300,7 @@ function observe(uint32[] calldata secondsAgos)
     external
     view
     override
+    noDelegateCall
     returns (int56[] memory tickCumulatives, uint160[] memory secondsPerLiquidityCumulativeX128s)
 ```
 
@@ -504,7 +505,8 @@ event CollectProtocol(
 | `TLM` | Tick lower < MIN_TICK |
 | `TUM` | Tick upper > MAX_TICK |
 | `AI` | Already initialized |
-| `M0` | Mint amount is 0 |
+| `M0` | Insufficient token0 transferred in mint callback |
+| `M1` | Insufficient token1 transferred in mint callback |
 | `AS` | Amount specified is 0 |
 | `IIA` | Invalid input amount |
 | `SPL` | Invalid sqrt price limit |

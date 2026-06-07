@@ -319,7 +319,7 @@ async function swapTokensForVC(tokenIn, fee, amountIn) {
     // Encode multicall
     const calls = [
         router.interface.encodeFunctionData('exactInputSingle', [swapParams]),
-        router.interface.encodeFunctionData('unwrapWVC', [
+        router.interface.encodeFunctionData('unwrapWETH9', [
             0,  // amountMinimum (add slippage)
             signer.address  // recipient
         ])

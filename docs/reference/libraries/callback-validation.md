@@ -18,7 +18,7 @@ function verifyCallback(
     address tokenA,
     address tokenB,
     uint24 fee
-) internal view returns (IVinuSwapPool pool)
+) internal view returns (IUniswapV3Pool pool)
 ```
 
 Verifies `msg.sender` is a valid pool deployed by the factory.
@@ -40,7 +40,7 @@ Verifies `msg.sender` is a valid pool deployed by the factory.
 function verifyCallback(
     address factory,
     PoolAddress.PoolKey memory poolKey
-) internal view returns (IVinuSwapPool pool)
+) internal view returns (IUniswapV3Pool pool)
 ```
 
 Same as above but accepts a PoolKey struct.
@@ -116,14 +116,14 @@ library CallbackValidation {
         address tokenA,
         address tokenB,
         uint24 fee
-    ) internal view returns (IVinuSwapPool pool) {
-        pool = IVinuSwapPool(
+    ) internal view returns (IUniswapV3Pool pool) {
+        pool = IUniswapV3Pool(
             PoolAddress.computeAddress(
                 factory,
                 PoolAddress.getPoolKey(tokenA, tokenB, fee)
             )
         );
-        require(msg.sender == address(pool), 'Invalid callback');
+        require(msg.sender == address(pool));
     }
 }
 ```

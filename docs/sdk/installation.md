@@ -8,7 +8,7 @@ The SDK is included in the VinuSwap repository and can be imported directly.
 
 ```typescript
 // Import from local SDK
-import { VinuSwap } from './sdk/core';
+import VinuSwap from './sdk/core';
 import { encodePrice, decodePrice } from './sdk/utils';
 ```
 
@@ -17,11 +17,11 @@ import { encodePrice, decodePrice } from './sdk/utils';
 When published as an npm package:
 
 ```bash
-npm install @vinuswap/sdk
+npm install vinu-swap
 ```
 
 ```typescript
-import { VinuSwap } from '@vinuswap/sdk';
+import VinuSwap from 'vinu-swap';
 ```
 
 ## Dependencies
@@ -76,7 +76,7 @@ const provider = new ethers.providers.JsonRpcProvider('http://localhost:8545');
 
 ```typescript
 const provider = new ethers.providers.JsonRpcProvider(
-    'https://rpc.vinuchain.org'
+    'https://vinuchain-rpc.com'
 );
 ```
 
@@ -94,7 +94,7 @@ const signer = provider.getSigner();
 
 ```typescript
 import { ethers } from 'ethers';
-import { VinuSwap } from './sdk/core';
+import VinuSwap from './sdk/core';
 
 // Contract addresses (from deployment)
 const ADDRESSES = {
@@ -154,8 +154,8 @@ async function verifySetup(sdk: VinuSwap) {
     console.log('Quote works:', quote[0].toString());
 
     // Check signer (if connected)
-    if (sdk.signer) {
-        const address = await sdk.signer.getAddress();
+    if (sdk.signerOrProvider instanceof ethers.Signer) {
+        const address = await (sdk.signerOrProvider as ethers.Signer).getAddress();
         console.log('Signer address:', address);
     }
 

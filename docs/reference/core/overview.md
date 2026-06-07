@@ -40,7 +40,7 @@ The core contracts provide the fundamental AMM functionality and safety guarante
 │  └──────────────────┘  └──────────────────┘                    │
 │                                                                 │
 │  Core Functions:                                                │
-│  - initialize()  - swap()   - mint()   - burn()                │
+│  - initialize() (owner-only)  - swap()   - mint()   - burn()   │
 │  - collect()     - observe()                                    │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -160,8 +160,13 @@ modifier lock() {
 Core contracts cannot be used as implementation targets:
 
 ```solidity
-modifier noDelegateCall() {
+// Private method prevents inlining the immutable address bytes at every call site
+function checkNotDelegateCall() private view {
     require(address(this) == original);
+}
+
+modifier noDelegateCall() {
+    checkNotDelegateCall();
     _;
 }
 ```

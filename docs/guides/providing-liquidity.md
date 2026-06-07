@@ -275,7 +275,7 @@ async function collectToVC(tokenId) {
 
     const calls = [
         positionManager.interface.encodeFunctionData('collect', [collectParams]),
-        positionManager.interface.encodeFunctionData('unwrapWVC', [0, signer.address]),
+        positionManager.interface.encodeFunctionData('unwrapWETH9', [0, signer.address]),
         positionManager.interface.encodeFunctionData('sweepToken', [
             position.token0 === WVC ? position.token1 : position.token0,
             0,

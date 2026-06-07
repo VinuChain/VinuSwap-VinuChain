@@ -259,7 +259,6 @@ Burns a position NFT.
 **Requirements:**
 - Caller must be owner or approved
 - Position liquidity must be 0
-- Position must NOT be locked
 - All tokens must be collected (tokensOwed0 = tokensOwed1 = 0)
 
 ---
@@ -288,7 +287,7 @@ Locks a position until a specified timestamp.
 
 **Requirements:**
 - Caller must be owner or approved
-- `lockedUntil` must be in the future or extend current lock
+- `lockedUntil` must be strictly greater than both `block.timestamp` AND the current `position.lockedUntil`
 
 **Effects:**
 - Position cannot call `decreaseLiquidity()` until lock expires
@@ -404,7 +403,7 @@ event Collect(
 
 ```solidity
 event Lock(
-    uint256 indexed tokenId,
+    uint256 tokenId,
     uint256 lockedUntil
 );
 ```

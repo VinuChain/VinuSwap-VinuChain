@@ -28,6 +28,10 @@ Frequently asked questions covering:
 
 ## External Resources
 
+### VinuSwap Security
+
+A [Security Companion Document](https://github.com/VinuChain/VinuSwap-VinuChain/blob/main/Security%20Companion%20Document.pdf) covering VinuSwap's extensions (Controller, TieredDiscount, fee manager system, position locking) is included in the repository root.
+
 ### Uniswap V3 Documentation
 
 VinuSwap is based on Uniswap V3. These resources provide additional context:

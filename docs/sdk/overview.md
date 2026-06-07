@@ -24,7 +24,7 @@ sdk/
 ## Quick Start
 
 ```typescript
-import { VinuSwap } from './sdk/core';
+import VinuSwap from './sdk/core';
 import { encodePrice } from './sdk/utils';
 
 // Create SDK instance
@@ -42,9 +42,12 @@ const vinuSwap = await VinuSwap.create(
 const connected = vinuSwap.connect(signer);
 
 // Execute swap
-const result = await connected.swap(
+const tx = await connected.swapExactInput(
+    tokenIn,
+    tokenOut,
     amountIn,
     minAmountOut,
+    recipient,
     deadline
 );
 ```
@@ -102,9 +105,11 @@ class VinuSwap {
     connect(signer: Signer): VinuSwap;
 
     // Operations
-    async swap(...): Promise<SwapResult>;
-    async mint(...): Promise<MintResult>;
-    async getQuote(...): Promise<Quote>;
+    async swapExactInput(...): Promise<ethers.ContractTransaction>;
+    async swapExactOutput(...): Promise<ethers.ContractTransaction>;
+    async quoteExactInput(...): Promise<string>;
+    async quoteExactOutput(...): Promise<string>;
+    async mint(...): Promise<ethers.ContractTransaction>;
 }
 ```
 
@@ -116,22 +121,7 @@ class VinuSwap {
 
 ## Type Safety
 
-The SDK is written in TypeScript with full type definitions:
-
-```typescript
-interface SwapParams {
-    amountIn: BigNumber;
-    amountOutMinimum: BigNumber;
-    deadline: number;
-    sqrtPriceLimitX96?: BigNumber;
-}
-
-interface SwapResult {
-    amountIn: BigNumber;
-    amountOut: BigNumber;
-    transactionHash: string;
-}
-```
+The SDK is written in TypeScript with full type definitions. All swap and liquidity methods return `Promise<ethers.ContractTransaction>`; quote methods return `Promise<string>`.
 
 ## Next Steps
 

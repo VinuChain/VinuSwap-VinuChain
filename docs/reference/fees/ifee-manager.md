@@ -76,7 +76,7 @@ Balance-based discounts:
 ```solidity
 contract TieredDiscount is IFeeManager {
     function computeFee(uint24 fee) external view returns (uint24) {
-        uint256 balance = discountToken.balanceOf(tx.origin);
+        uint256 balance = IERC20(token).balanceOf(tx.origin);
         uint16 discount = getDiscount(balance);
         return uint24(uint256(fee) * (10000 - discount) / 10000);
     }
@@ -105,7 +105,7 @@ contract OverridableFeeManager is IFeeManager {
 
 ```solidity
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+pragma solidity ^0.7.0;
 
 import '../interfaces/IFeeManager.sol';
 

@@ -46,7 +46,7 @@ npm run test
 Or run specific tests:
 
 ```bash
-npx hardhat test test/core/UniswapV3Factory.spec.ts
+node scripts/run_hardhat_with_ts_node_files.js test test/core/UniswapV3Factory.spec.ts --trace
 ```
 
 ## Start Local Network
@@ -56,7 +56,7 @@ npx hardhat node
 ```
 
 This starts a local Hardhat node with:
-- 2000 test accounts with 10,000 VC each
+- 80 test accounts (override with HARDHAT_ACCOUNTS_COUNT)
 - Block time: instant
 - Chain ID: 31337
 
@@ -124,11 +124,11 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
-      accounts: { count: 2000 },
+      accounts: { count: 80 },
     },
     vinu: {
-      url: process.env.VINU_RPC_URL || "",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      url: process.env.VINUSWAP_RPC_URL || "https://vinuchain-rpc.com",
+      accounts: vinuOwnerPrivateKey ? [vinuOwnerPrivateKey] : [],
     },
   },
 };
@@ -140,7 +140,7 @@ Create a `.env` file:
 
 ```bash
 # VinuChain RPC endpoint
-VINU_RPC_URL=https://rpc.vinuchain.org
+VINUSWAP_RPC_URL=https://vinuchain-rpc.com
 
 # Deployer private key (without 0x prefix)
 PRIVATE_KEY=your_private_key_here
@@ -154,7 +154,7 @@ ETHERSCAN_API_KEY=your_api_key
 The SDK is in the `sdk/` directory:
 
 ```typescript
-import { VinuSwap } from './sdk/core';
+import VinuSwap from './sdk/core';
 
 // Create SDK instance
 const vinuSwap = await VinuSwap.create(
@@ -186,7 +186,7 @@ npx hardhat compile
 ### 3. Run Affected Tests
 
 ```bash
-npx hardhat test test/path/to/test.spec.ts
+node scripts/run_hardhat_with_ts_node_files.js test test/path/to/test.spec.ts --trace
 ```
 
 ### 4. Run Full Test Suite

@@ -159,13 +159,14 @@ await positionManager.increaseLiquidity({
 
 ### How do fee discounts work?
 
-VinuSwap's TieredDiscount contract reduces fees based on token holdings:
+VinuSwap's TieredDiscount contract reduces fees based on token holdings. Tiers are configured at deployment time. The example values in `scripts/deploy.ts` are:
 
 ```
-Balance ≥ 1,000,000 → 50% discount
-Balance ≥ 500,000  → 30% discount
-Balance ≥ 100,000  → 10% discount
-Balance < 100,000  → No discount
+Balance ≥ 1,000,000 tokens → 4% discount
+Balance ≥   100,000 tokens → 3% discount
+Balance ≥    10,000 tokens → 2% discount
+Balance ≥     1,000 tokens → 1% discount
+Balance <     1,000 tokens → No discount
 ```
 
 ### How do I check my fee discount?
@@ -253,7 +254,7 @@ npm install
 npx hardhat compile
 
 # Deploy locally
-npx hardhat run scripts/deploy.js --network localhost
+npx hardhat run scripts/deploy.ts --network localhost
 ```
 
 ### How do I get the pool init code hash?
@@ -269,7 +270,7 @@ const hash = await poolInitHelper.POOL_INIT_CODE_HASH();
 ### How do I verify contracts?
 
 ```bash
-npx hardhat verify --network vinuchain CONTRACT_ADDRESS CONSTRUCTOR_ARGS
+npx hardhat verify --network vinu CONTRACT_ADDRESS CONSTRUCTOR_ARGS
 ```
 
 ## Troubleshooting

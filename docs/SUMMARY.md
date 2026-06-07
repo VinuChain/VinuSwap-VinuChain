@@ -16,6 +16,7 @@
 * [Position Locking](guides/position-locking.md)
 * [Fee Discounts](guides/fee-discounts.md)
 * [Using the Quoter](guides/quoting.md)
+* [Listing Your Token](guides/listing-your-token.md)
 
 ## Core Contracts
 

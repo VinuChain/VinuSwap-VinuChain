@@ -8,6 +8,8 @@ Security best practices and considerations for VinuSwap integration.
 
 VinuSwap is based on Uniswap V3, one of the most thoroughly audited DeFi protocols. The core AMM logic inherits security properties from the battle-tested Uniswap V3 codebase.
 
+A [Security Companion Document](https://github.com/VinuChain/VinuSwap-VinuChain/blob/main/Security%20Companion%20Document.pdf) specific to VinuSwap's extensions (Controller, TieredDiscount, fee manager system, position locking) is included in the repository root.
+
 ### Key Security Features
 
 #### 1. Reentrancy Protection

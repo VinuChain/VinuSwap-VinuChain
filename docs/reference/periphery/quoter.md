@@ -27,7 +27,8 @@ This allows simulation without state changes or token transfers.
 
 ```solidity
 function quoteExactInputSingle(QuoteExactInputSingleParams memory params)
-    external
+    public
+    override
     returns (
         uint256 amountOut,
         uint160 sqrtPriceX96After,
@@ -92,7 +93,7 @@ console.log('Ticks crossed:', ticksCrossed.toString());
 function quoteExactInput(
     bytes memory path,
     uint256 amountIn
-) external override returns (
+) public override returns (
     uint256 amountOut,
     uint160[] memory sqrtPriceX96AfterList,
     uint32[] memory initializedTicksCrossedList,
@@ -136,7 +137,8 @@ const [amountOut, prices, ticks, gas] = await quoter.callStatic.quoteExactInput(
 
 ```solidity
 function quoteExactOutputSingle(QuoteExactOutputSingleParams memory params)
-    external
+    public
+    override
     returns (
         uint256 amountIn,
         uint160 sqrtPriceX96After,
@@ -200,7 +202,7 @@ console.log('Required input:', ethers.utils.formatEther(amountIn), 'WVC');
 function quoteExactOutput(
     bytes memory path,
     uint256 amountOut
-) external override returns (
+) public override returns (
     uint256 amountIn,
     uint160[] memory sqrtPriceX96AfterList,
     uint32[] memory initializedTicksCrossedList,

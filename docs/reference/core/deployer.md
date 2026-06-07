@@ -37,7 +37,7 @@ int24 internal _tickSpacing;
 address internal _feeManager;
 ```
 
-Temporarily holds deployment parameters during pool creation. Set before `new VinuSwapPool()` and read via `parameters()` during pool constructor.
+Holds deployment parameters set immediately before `new VinuSwapPool()` is called; the pool constructor reads them via `parameters()`.
 
 ### parameters
 

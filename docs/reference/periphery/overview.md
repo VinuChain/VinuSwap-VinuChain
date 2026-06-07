@@ -49,7 +49,7 @@ Stores immutable references to factory and WVC:
 
 ```solidity
 address public immutable factory;
-address public immutable WVC;
+address public immutable WETH9;
 ```
 
 ### PeripheryPayments
@@ -58,9 +58,9 @@ Handles token transfers and VC wrapping:
 
 ```solidity
 function pay(address token, address payer, address recipient, uint256 value)
-function unwrapWVC(uint256 amountMinimum, address recipient)
+function unwrapWETH9(uint256 amountMinimum, address recipient)
 function sweepToken(address token, uint256 amountMinimum, address recipient)
-function refundVC()
+function refundETH()
 ```
 
 ### PeripheryPaymentsWithFee
@@ -68,7 +68,7 @@ function refundVC()
 Extends PeripheryPayments with fee extraction:
 
 ```solidity
-function unwrapWVCWithFee(uint256 amountMinimum, address recipient, uint256 feeBips, address feeRecipient)
+function unwrapWETH9WithFee(uint256 amountMinimum, address recipient, uint256 feeBips, address feeRecipient)
 function sweepTokenWithFee(address token, uint256 amountMinimum, address recipient, uint256 feeBips, address feeRecipient)
 ```
 
@@ -224,7 +224,7 @@ await router.exactInputSingle({
     tokenOut: WVC,
     recipient: ADDRESS_ZERO // Indicates unwrap
 });
-await router.unwrapWVC(amountOutMinimum, recipientAddress);
+await router.unwrapWETH9(amountOutMinimum, recipientAddress);
 ```
 
 ## VinuSwap Extensions

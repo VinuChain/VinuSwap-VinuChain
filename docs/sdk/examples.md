@@ -5,14 +5,13 @@ Complete examples for common VinuSwap operations.
 ## Basic Setup
 
 ```typescript
-import { ethers } from 'ethers';
-import { VinuSwap } from './sdk/core';
+import { ethers, BigNumber } from 'ethers';
+import VinuSwap from './sdk/core';
 import { encodePrice, decodePrice } from './sdk/utils';
-import { nearestUsableTick } from '@uniswap/v3-sdk';
 
 // Configuration
 const config = {
-    rpcUrl: 'https://rpc.vinuchain.org',
+    rpcUrl: 'https://vinuchain-rpc.com',
     factory: '0xd74dEe1C78D5C58FbdDe619b707fcFbAE50c3EEe',
     quoter: '0xEed635Fa2343355d9bA726C379F2B5dEa70fE65C',
     router: '0x48f450475a8b501A7480C1Fd02935a7327F713Ad',
@@ -21,11 +20,6 @@ const config = {
     usdt: '0xC0264277fcCa5FCfabd41a8bC01c1FcAF8383E41',     // USDT on VinuChain
     pool: '0x...'       // Pool address (depends on token pair)
 };
-
-// Helper: convert price to tick
-function priceToTick(price: number): number {
-    return Math.floor(Math.log(price) / Math.log(1.0001));
-}
 
 // Setup
 const provider = new ethers.providers.JsonRpcProvider(config.rpcUrl);
@@ -57,23 +51,25 @@ async function simpleSwap() {
     const amountIn = ethers.utils.parseEther('0.1');
 
     // Get quote first
-    const quote = await sdk.getQuote(config.wvc, config.usdt, amountIn);
-    console.log('Expected:', ethers.utils.formatUnits(quote.amountOut, 6), 'USDT');
+    const amountOut = BigNumber.from(
+        await sdk.quoteExactInput(config.wvc, config.usdt, amountIn)
+    );
+    console.log('Expected:', ethers.utils.formatUnits(amountOut, 6), 'USDT');
 
     // Calculate minimum with 0.5% slippage
-    const minOut = quote.amountOut.mul(9950).div(10000);
+    const minOut = amountOut.mul(9950).div(10000);
 
     // Execute swap
-    const result = await sdk.swap(
+    const tx = await sdk.swapExactInput(
         config.wvc,
         config.usdt,
         amountIn,
         minOut,
-        Math.floor(Date.now() / 1000) + 1800
+        await signer.getAddress(),
+        new Date(Date.now() + 1800_000)
     );
-
-    console.log('Swap executed:', result.hash);
-    console.log('Received:', ethers.utils.formatUnits(result.amountOut, 6), 'USDT');
+    const receipt = await tx.wait();
+    console.log('Swap executed:', receipt.transactionHash);
 }
 ```
 
@@ -147,11 +143,7 @@ async function multiHopSwap() {
 async function createPosition() {
     const sdk = await getSDK();
 
-    // Define price range: $1,900 to $2,100
-    const tickSpacing = 60;
-    const tickLower = nearestUsableTick(priceToTick(1900), tickSpacing);
-    const tickUpper = nearestUsableTick(priceToTick(2100), tickSpacing);
-
+    // Define price range using price ratios (token1/token0): 1900 to 2100
     // Amounts to add
     const amount0 = ethers.utils.parseUnits('1000', 6);  // 1000 USDT
     const amount1 = ethers.utils.parseEther('0.5');       // 0.5 WVC
@@ -160,22 +152,19 @@ async function createPosition() {
     await sdk.token0Contract.approve(config.positionManager, amount0);
     await sdk.token1Contract.approve(config.positionManager, amount1);
 
-    // Mint position
-    const result = await sdk.mint(
-        tickLower,
-        tickUpper,
+    // Mint position (ratioLower, ratioUpper are price ratios, not ticks)
+    const tx = await sdk.mint(
+        1900,    // lower price ratio (token1/token0)
+        2100,    // upper price ratio
         amount0,
         amount1,
-        0,
-        0,
-        Math.floor(Date.now() / 1000) + 1800
+        0.005,   // 0.5% slippage — must be a finite number in [0, 1]
+        await signer.getAddress(),
+        new Date(Date.now() + 1800_000)
     );
-
-    console.log('Position created!');
-    console.log('Token ID:', result.tokenId.toString());
-    console.log('Liquidity:', result.liquidity.toString());
-    console.log('Amount0 used:', ethers.utils.formatUnits(result.amount0, 6));
-    console.log('Amount1 used:', ethers.utils.formatEther(result.amount1));
+    const receipt = await tx.wait();
+    console.log('Position created, tx:', receipt.transactionHash);
+    // tokenId / liquidity / amounts are emitted in the receipt's events
 }
 ```
 
@@ -199,11 +188,11 @@ async function addLiquidity(tokenId: ethers.BigNumber) {
         additionalAmount1,
         0,
         0,
-        Math.floor(Date.now() / 1000) + 1800
+        new Date(Date.now() + 1800_000)
     );
 
-    console.log('Liquidity increased!');
-    console.log('New liquidity:', result.liquidity.toString());
+    await result.wait();
+    console.log('Liquidity increased, tx:', result.hash);
 }
 ```
 
@@ -221,9 +210,8 @@ async function collectFees(tokenId: ethers.BigNumber) {
         ethers.constants.MaxUint128
     );
 
-    console.log('Fees collected!');
-    console.log('Token0:', ethers.utils.formatUnits(result.amount0, 6));
-    console.log('Token1:', ethers.utils.formatEther(result.amount1));
+    await result.wait();
+    console.log('Collected, tx:', result.hash);
 }
 ```
 
@@ -243,7 +231,7 @@ async function closePosition(tokenId: ethers.BigNumber) {
             position.liquidity,
             0,
             0,
-            Math.floor(Date.now() / 1000) + 1800
+            new Date(Date.now() + 1800_000)
         );
     }
 
@@ -256,7 +244,7 @@ async function closePosition(tokenId: ethers.BigNumber) {
     );
 
     // 3. Burn the NFT
-    await sdk.positionManager.burn(tokenId);
+    await sdk.burn(tokenId);
 
     console.log('Position closed and burned');
 }
@@ -271,9 +259,10 @@ async function monitorPool() {
     const sdk = await getSDK();
 
     // Get initial state
-    const state = await sdk.getPoolState();
-    console.log('Current tick:', state.tick);
-    console.log('Current liquidity:', state.liquidity.toString());
+    const slot0 = await sdk.pool.slot0();
+    const liquidity = await sdk.pool.liquidity();
+    console.log('Current tick:', slot0.tick);
+    console.log('Current liquidity:', liquidity.toString());
 
     // Subscribe to swap events
     sdk.pool.on('Swap', (sender, recipient, amount0, amount1, sqrtPriceX96, liquidity, tick) => {
@@ -294,18 +283,18 @@ async function getPositionValue(tokenId: ethers.BigNumber) {
     const sdk = await getSDK();
 
     const position = await sdk.positionManager.positions(tokenId);
-    const state = await sdk.getPoolState();
+    const slot0 = await sdk.pool.slot0();
 
     // Calculate token amounts
     const { amount0, amount1 } = getAmountsForLiquidity(
-        state.sqrtPriceX96,
+        slot0.sqrtPriceX96,
         getSqrtRatioAtTick(position.tickLower),
         getSqrtRatioAtTick(position.tickUpper),
         position.liquidity
     );
 
     // Get token prices
-    const price = decodePrice(state.sqrtPriceX96);
+    const price = decodePrice(slot0.sqrtPriceX96);
 
     // Calculate total value in token1
     const value0InToken1 = amount0.mul(Math.floor(price * 1e6)).div(1e6);
@@ -325,7 +314,7 @@ async function safeOperation() {
     const sdk = await getSDK();
 
     try {
-        await sdk.swap(...);
+        await sdk.swapExactInput(...);
     } catch (error: any) {
         // Parse error
         if (error.code === 'INSUFFICIENT_FUNDS') {
@@ -366,7 +355,7 @@ class VinuSwapDApp {
     }
 
     async getAddress() {
-        return this.sdk?.signer?.getAddress();
+        return (this.sdk?.signerOrProvider as ethers.Signer | undefined)?.getAddress();
     }
 
     async getBalances() {
@@ -383,21 +372,22 @@ class VinuSwapDApp {
 
     async getQuote(amountIn: ethers.BigNumber) {
         if (!this.sdk) throw new Error('Not connected');
-        return this.sdk.getQuote(config.wvc, config.usdt, amountIn);
+        return BigNumber.from(await this.sdk.quoteExactInput(config.wvc, config.usdt, amountIn));
     }
 
     async swap(amountIn: ethers.BigNumber, slippage: number = 0.5) {
         if (!this.sdk) throw new Error('Not connected');
 
         const quote = await this.getQuote(amountIn);
-        const minOut = quote.amountOut.mul(10000 - slippage * 100).div(10000);
+        const minOut = quote.mul(10000 - slippage * 100).div(10000);
 
-        return this.sdk.swap(
+        return this.sdk.swapExactInput(
             config.wvc,
             config.usdt,
             amountIn,
             minOut,
-            Math.floor(Date.now() / 1000) + 1800
+            (await this.getAddress())!,
+            new Date(Date.now() + 1800_000)
         );
     }
 

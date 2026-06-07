@@ -256,5 +256,6 @@ const usableTick = await withCustomTickSpacing(3000, 60, () => {
 ## Related
 
 - [VinuSwap Class](vinuswap-class.md)
-- [Getting Started](getting-started.md)
+- [Installation](installation.md)
+- [Examples](examples.md)
 - [@uniswap/v3-sdk Documentation](https://docs.uniswap.org/sdk/v3/overview)

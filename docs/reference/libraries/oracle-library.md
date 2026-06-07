@@ -40,6 +40,46 @@ function getOldestObservationSecondsAgo(
 
 Returns the age of the oldest available observation.
 
+### getBlockStartingTickAndLiquidity
+
+```solidity
+function getBlockStartingTickAndLiquidity(
+    address pool
+) internal view returns (int24 tick, uint128 liquidity)
+```
+
+Returns the tick and liquidity as of the start of the current block.
+
+### WeightedTickData
+
+```solidity
+struct WeightedTickData {
+    int24 tick;
+    uint128 weight;
+}
+```
+
+### getWeightedArithmeticMeanTick
+
+```solidity
+function getWeightedArithmeticMeanTick(
+    WeightedTickData[] memory weightedTickData
+) internal pure returns (int24 weightedArithmeticMeanTick)
+```
+
+Computes the weighted arithmetic mean tick from an array of tick/weight pairs.
+
+### getChainedPrice
+
+```solidity
+function getChainedPrice(
+    address[] memory tokens,
+    int24[] memory ticks
+) internal pure returns (int256 syntheticTick)
+```
+
+Returns the synthetic tick representing the price of the first token in `tokens` in terms of the last, chaining through intermediate pairs.
+
 ## Usage Examples
 
 ### Get TWAP Price

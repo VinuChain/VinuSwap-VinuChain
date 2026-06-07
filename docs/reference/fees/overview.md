@@ -172,7 +172,6 @@ await factory.createPool(
 
 ```javascript
 const controller = await Controller.deploy(
-    factory.address,
     [account1, account2, account3],  // Fee recipients
     [1, 2, 2]                        // Shares
 );
@@ -199,8 +198,10 @@ await controller.collectProtocolFees(
 );
 
 // Each account withdraws their share
-await controller.connect(account1).withdraw(token0);
-await controller.connect(account1).withdraw(token1);
+const owed0 = await controller.balanceOf(account1.address, token0);
+await controller.connect(account1).withdraw(token0, owed0);
+const owed1 = await controller.balanceOf(account1.address, token1);
+await controller.connect(account1).withdraw(token1, owed1);
 ```
 
 ## Fee Manager Implementations

@@ -11,7 +11,7 @@ The network is already configured in `hardhat.config.ts`:
 ```typescript
 networks: {
     vinu: {
-        url: process.env.VINU_RPC_URL || 'https://rpc.vinuchain.org',
+        url: process.env.VINUSWAP_RPC_URL || 'https://vinuchain-rpc.com',
         accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
         chainId: 207
     }
@@ -105,7 +105,6 @@ async function main() {
     // Deploy Controller
     const Controller = await ethers.getContractFactory('Controller');
     const controller = await Controller.deploy(
-        factory.address,
         accounts,
         shares
     );
@@ -283,7 +282,6 @@ async function main() {
 
     const Controller = await ethers.getContractFactory('Controller');
     const controller = await Controller.deploy(
-        factory.address,
         config.FEE_ACCOUNTS,
         config.FEE_SHARES
     );

@@ -11,18 +11,22 @@ Pools are created through the Controller (which owns the Factory).
 ```typescript
 async function createPool(
     controller: Contract,
+    factoryAddress: string,
     tokenA: string,
     tokenB: string,
     fee: number,
     tickSpacing: number,
-    feeManager: string
+    feeManager: string,
+    sqrtPriceX96: BigNumber
 ) {
     const tx = await controller.createPool(
+        factoryAddress,
         tokenA,
         tokenB,
         fee,
         tickSpacing,
-        feeManager
+        feeManager,
+        sqrtPriceX96
     );
 
     const receipt = await tx.wait();
@@ -86,13 +90,18 @@ async function main() {
     for (const pool of pools) {
         console.log(`\nCreating ${pool.name} pool...`);
 
-        // Create pool
+        // Encode initial price before creating pool
+        const sqrtPriceX96 = encodeSqrtRatioX96(pool.initialPrice);
+
+        // Create pool (initialization is performed inside createPool)
         const tx = await controller.createPool(
+            FACTORY,
             pool.tokenA,
             pool.tokenB,
             pool.fee,
             pool.tickSpacing,
-            FEE_MANAGER
+            FEE_MANAGER,
+            sqrtPriceX96
         );
 
         const receipt = await tx.wait();
@@ -100,12 +109,8 @@ async function main() {
         const poolAddress = event.args.pool;
 
         console.log(`  Pool address: ${poolAddress}`);
-        deployed[pool.name.replace('/', '_')] = poolAddress;
-
-        // Initialize pool
-        const sqrtPriceX96 = encodeSqrtRatioX96(pool.initialPrice);
-        await controller.initialize(poolAddress, sqrtPriceX96);
         console.log(`  Initialized at price ${pool.initialPrice}`);
+        deployed[pool.name.replace('/', '_')] = poolAddress;
 
         // Set protocol fee
         await controller.setFeeProtocol(poolAddress, 5, 5);  // 20%

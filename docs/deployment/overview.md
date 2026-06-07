@@ -84,7 +84,7 @@ cp .env.example .env
 
 ```bash
 # .env
-VINU_RPC_URL=https://rpc.vinuchain.org
+VINUSWAP_RPC_URL=https://vinuchain-rpc.com
 PRIVATE_KEY=your_deployer_private_key
 
 # Optional

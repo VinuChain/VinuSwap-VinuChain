@@ -13,6 +13,13 @@ three fee-manager patterns:
 - `OverridableFeeManager`: forwards to a default fee manager unless a specific
   pool override is configured.
 
+> **Active default on VinuChain:** `TieredDiscount` is the active default fee
+> manager on the VinuChain deployment. It is set as the default via the
+> `configure:discount-defaults` script (`set_default_discount_fee_manager.ts`),
+> which configures `OverridableFeeManager` to use `TieredDiscount` as its default.
+> Most pools on VinuChain will therefore apply tiered discounts unless a
+> pool-specific override is set.
+
 The exact tiers are deployment configuration, not protocol constants. A live UI
 should resolve the pool's effective fee manager before showing a discount.
 
