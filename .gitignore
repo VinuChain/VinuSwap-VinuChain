@@ -13,3 +13,6 @@ artifacts
 typechain-types/**
 
 *_parsed.sol
+
+# OMC local state
+.omc/
