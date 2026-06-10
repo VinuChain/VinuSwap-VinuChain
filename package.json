@@ -49,6 +49,7 @@
     "test_legacy": "./node_modules/.bin/mocha --full-trace --config ./test/mocharc.nightly.json",
     "preprocess": "npx ts-node scripts/preprocess_for_tests.ts",
     "test": "node scripts/run_hardhat_with_ts_node_files.js test --trace",
+    "check:periphery-purity": "node scripts/check_periphery_purity.js",
     "configure:discount-defaults": "node scripts/run_hardhat_with_ts_node_files.js run scripts/main_scripts/set_default_discount_fee_manager.ts --network vinu"
   }
 }
