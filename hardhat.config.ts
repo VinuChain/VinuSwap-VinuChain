@@ -121,13 +121,16 @@ export default{
         }
         
     },
-    allowUnlimitedContractSize: true,
     contractSizer: {
         // Run with `npx hardhat size-contracts` on demand instead of every compile.
         runOnCompile: false
     },
     networks: {
         hardhat: {
+            // allowUnlimitedContractSize is a per-network option; at config root
+            // Hardhat ignores it. The in-network size limit is what matters for
+            // local test deployments, so it lives here.
+            allowUnlimitedContractSize: true,
             // Generating + funding 2000 signers slows hardhat node startup
             // significantly; 80 covers the SDK suite's unique signer helper. Set
             // HARDHAT_ACCOUNTS_COUNT to override for stress tests.
@@ -136,6 +139,9 @@ export default{
             }
         },
         vinu: {
+            // Pin the chain ID so a wrong or hijacked RPC URL cannot trick ethers
+            // into signing transactions for a different chain (audit L-3).
+            chainId: 207,
             url: process.env.VINUSWAP_RPC_URL || "https://vinuchain-rpc.com",
             accounts: vinuOwnerPrivateKey ? [vinuOwnerPrivateKey] : []
         }
