@@ -1,0 +1,35 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Compile & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile contracts
+        run: npx hardhat compile
+
+      - name: Periphery upstream-purity check
+        # Fails loudly if any vendored @uniswap/v3-periphery file drifts from the
+        # published package. Core math is imported from @uniswap/v3-core (not
+        # vendored), so it cannot drift and needs no separate check.
+        run: node scripts/check_periphery_purity.js
+
+      - name: Run test suite
+        run: npm test
