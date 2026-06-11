@@ -3,7 +3,13 @@ pragma solidity >=0.5.0;
 
 /// @title Provides functions for deriving a pool address from the factory, tokens, and the fee
 library PoolAddress {
-    bytes32 internal constant POOL_INIT_CODE_HASH = 0x4fbe579c12ff49f3db19ca7f7ffa97db7e386da9f10833152cca6b821b2b744c;
+    // Local deterministic value for the vendored test periphery; reproduced by a clean
+    // `npm ci && npx hardhat compile` at HEAD (solc 0.7.6, runs:1, v3-core 1.0.1).
+    // The LIVE mainnet factory (chain 207) pools derive with
+    //   0xe8b892178c932bab07f2a26456a3a5e2c79d3301113659dc834ca80e3ea3596e
+    // — any periphery deployment against the live factory MUST use that value.
+    // See reports runbook vinuswap-init-code-hash.md (audit M-2).
+    bytes32 internal constant POOL_INIT_CODE_HASH = 0xabbbd0d15b71abfbaad4b7a124f1070d10b298946137a0f9178c1a8d09b9ea3f;
 
     /// @notice The identifying key of the pool
     struct PoolKey {

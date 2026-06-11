@@ -309,22 +309,10 @@ describe('test VinuSwapPool', function () {
             )
         })
 
-        // The drift guard: the periphery's hardcoded constant must equal the hash
-        // recomputed from the pool creation code the factory actually deploys.
-        //
-        // PENDING because of a KNOWN PRE-EXISTING MISMATCH (audit M-2): under this
-        // repo's current toolchain (solc 0.7.6, runs:1) PoolInitHelper computes
-        //   0xabbbd0d15b71abfbaad4b7a124f1070d10b298946137a0f9178c1a8d09b9ea3f
-        // while PoolAddress.sol still hardcodes the mainnet-deployment value
-        //   0x4fbe579c12ff49f3db19ca7f7ffa97db7e386da9f10833152cca6b821b2b744c.
-        // That mismatch is the root cause of the periphery "non-contract account"
-        // failures. The fix is NOT to edit the constant (it matches the live
-        // mainnet periphery); it is to align the build environment that produces
-        // the pool bytecode. It is .skip-ed so this documented pre-existing drift
-        // does not turn the whole CI run permanently red (which would mask new
-        // regressions); REMOVE the .skip the moment the toolchain is realigned so
-        // it becomes a hard guard that fails CI on any future drift.
-        it.skip('periphery POOL_INIT_CODE_HASH matches the on-chain pool init code hash', async function () {
+        // Drift guard: PoolAddress.POOL_INIT_CODE_HASH must equal the hash
+        // PoolInitHelper recomputes from VinuSwapPool's creation code under the
+        // factory's compiler settings (runs:1). Fails CI on any future drift.
+        it('periphery POOL_INIT_CODE_HASH matches the on-chain pool init code hash', async function () {
             const poolInitHelperBlueprint = await hre.ethers.getContractFactory('PoolInitHelper')
             const poolInitHelperContract = await poolInitHelperBlueprint.deploy()
             const onChainHash = (await poolInitHelperContract.getInitCodeHash()).toLowerCase()
