@@ -22,9 +22,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # binaries.soliditylang.org is intermittently flaky from GH runners
-      # (observed: partial-download EACCES, HH11 "compiler before downloaded").
-      # Cache the downloaded compilers and retry the first population once.
+      # Hardhat's compiler downloader races on fresh CI caches and can leave
+      # solc binaries without the execute bit (spawn EACCES; observed on 3 of
+      # 4 runs) or die mid-download (HH11). Fix perms + one retry, and cache
+      # the healed compilers so later runs skip the downloader entirely.
       - name: Cache hardhat compilers
         uses: actions/cache@v4
         with:
@@ -32,7 +33,16 @@ jobs:
           key: hardhat-solc-${{ runner.os }}-${{ hashFiles('hardhat.config.*') }}
 
       - name: Compile contracts
-        run: npx hardhat compile || { echo "retrying after transient solc download failure"; sleep 20; rm -rf ~/.cache/hardhat-nodejs/compilers-v2; npx hardhat compile; }
+        run: |
+          fix_solc_perms() { find ~/.cache/hardhat-nodejs/compilers-v2 -type f -name 'solc-*' -exec chmod +x {} + 2>/dev/null || true; }
+          fix_solc_perms
+          npx hardhat compile && exit 0
+          echo "compile failed — fixing solc perms and retrying"
+          fix_solc_perms
+          npx hardhat compile && exit 0
+          echo "still failing — purging compiler cache and re-downloading"
+          rm -rf ~/.cache/hardhat-nodejs/compilers-v2
+          npx hardhat compile || { fix_solc_perms; npx hardhat compile; }
 
       - name: Periphery upstream-purity check
         # Fails loudly if any vendored @uniswap/v3-periphery file drifts from the
