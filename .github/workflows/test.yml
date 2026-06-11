@@ -22,8 +22,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # binaries.soliditylang.org is intermittently flaky from GH runners
+      # (observed: partial-download EACCES, HH11 "compiler before downloaded").
+      # Cache the downloaded compilers and retry the first population once.
+      - name: Cache hardhat compilers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hardhat-nodejs/compilers-v2
+          key: hardhat-solc-${{ runner.os }}-${{ hashFiles('hardhat.config.*') }}
+
       - name: Compile contracts
-        run: npx hardhat compile
+        run: npx hardhat compile || { echo "retrying after transient solc download failure"; sleep 20; rm -rf ~/.cache/hardhat-nodejs/compilers-v2; npx hardhat compile; }
 
       - name: Periphery upstream-purity check
         # Fails loudly if any vendored @uniswap/v3-periphery file drifts from the
