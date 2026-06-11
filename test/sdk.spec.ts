@@ -13,6 +13,12 @@ import { time } from "@nomicfoundation/hardhat-network-helpers"
 
 import VinuSwap from '../sdk/core'
 
+// Deadlines must track the hardhat chain clock, not the wall clock: earlier
+// suites fast-forward the chain days ahead via evm_increaseTime, so a
+// Date.now()-based deadline is already expired ("Transaction too old") by the
+// time the full suite reaches these tests.
+const chainDeadline = async () => new Date(((await time.latest()) + 3600) * 1000)
+
 chai.use(chaiAsPromised)
 const expect = chai.expect
 
@@ -274,7 +280,7 @@ describe('test SDK', function () {
 
                 const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                 const users = await newUsers([[TOKEN_0, 100], [TOKEN_1, 100]])
-                await sdk.connect(deployer).mint(0.001, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
+                await sdk.connect(deployer).mint(0.001, 532, MONE.toString(), MONE.toString(), 0, users[0].address, await chainDeadline())
                 
 
                 expect(await sdk.positionAmount0('1')).to.be.equal('987883494261734200')
@@ -304,7 +310,7 @@ describe('test SDK', function () {
 
                     for (const slippageRatio of [-0.01, 1.01, Number.NaN]) {
                         await expect(
-                            sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), slippageRatio, users[0].address, new Date(Date.now() + 1000000))
+                            sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), slippageRatio, users[0].address, await chainDeadline())
                         ).to.be.rejectedWith('slippageRatio must be a finite number between 0 and 1')
                     }
                 })
@@ -326,7 +332,7 @@ describe('test SDK', function () {
 
                     const sdk = await VinuSwap.create(TOKEN_0, TOKEN_1, poolContract.address, quoterContract.address, routerContract.address, positionManagerContract.address, hre.ethers.provider.getSigner())
                     const users = await newUsers([])
-                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, users[0].address, new Date(Date.now() + 1000000))
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, users[0].address, await chainDeadline())
 
                     const mintQuote = await sdk.quoteMint(0.1, 532, MONE.toString(), MONE.toString())
 
@@ -359,10 +365,10 @@ describe('test SDK', function () {
 
                     const [alice, bob] = await newUsers([], [])
 
-                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, alice.address, new Date(Date.now() + 1000000))
-                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, alice.address, new Date(Date.now() + 1000000))
-                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, bob.address, new Date(Date.now() + 1000000))
-                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, alice.address, new Date(Date.now() + 1000000))
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, alice.address, await chainDeadline())
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, alice.address, await chainDeadline())
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, bob.address, await chainDeadline())
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, alice.address, await chainDeadline())
 
                     const alicePositions = await sdk.positionIdsByOwner(alice.address)
                     expect(alicePositions).to.be.an('array')
@@ -403,7 +409,7 @@ describe('test SDK', function () {
                     alice = users[0]
                     bob = users[1]
                     charlie = users[2]
-                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, charlie.address, new Date(Date.now() + 1000000))
+                    await sdk.connect(deployer).mint(0.1, 532, MONE.toString(), MONE.toString(), 0, charlie.address, await chainDeadline())
                 })
 
                 describe('swap', function() {
@@ -422,7 +428,7 @@ describe('test SDK', function () {
     
                             expect(amountOut).to.be.equal('91266728437306413')
     
-                            await sdk.connect(alice).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', bob.address, new Date(Date.now() + 1000000))
+                            await sdk.connect(alice).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', bob.address, await chainDeadline())
                             expect(await token0Contract.balanceOf(alice.address)).to.be.equal(
                                 '0' // All the input tokens are spent
                             )
@@ -439,7 +445,7 @@ describe('test SDK', function () {
     
                             expect(amountOut).to.be.equal('91266728437306413')
     
-                            await sdk.connect(alice).swapExactInput(TOKEN_1, TOKEN_0, MONE.div(10).toString(), '0', bob.address, new Date(Date.now() + 1000000))
+                            await sdk.connect(alice).swapExactInput(TOKEN_1, TOKEN_0, MONE.div(10).toString(), '0', bob.address, await chainDeadline())
                             expect(await token1Contract.balanceOf(alice.address)).to.be.equal(
                                 '0' // All the input tokens are spent
                             )
@@ -458,7 +464,7 @@ describe('test SDK', function () {
     
                             expect(amountIn).to.be.equal('99999999999999999')
     
-                            await sdk.connect(alice).swapExactOutput(TOKEN_0, TOKEN_1, '91266728437306413', MONE.div(10).toString(), bob.address, new Date(Date.now() + 1000000))
+                            await sdk.connect(alice).swapExactOutput(TOKEN_0, TOKEN_1, '91266728437306413', MONE.div(10).toString(), bob.address, await chainDeadline())
                             expect(await token0Contract.balanceOf(alice.address)).to.be.equal(
                                 '1' // All the input tokens are spent (except for 1 wei due to approximations)
                             )
@@ -475,7 +481,7 @@ describe('test SDK', function () {
     
                             expect(amountIn).to.be.equal(MONE.div(10).toString())
     
-                            await sdk.connect(alice).swapExactOutput(TOKEN_1, TOKEN_0, '91266728437306413', MONE.div(10).toString(), bob.address, new Date(Date.now() + 1000000))
+                            await sdk.connect(alice).swapExactOutput(TOKEN_1, TOKEN_0, '91266728437306413', MONE.div(10).toString(), bob.address, await chainDeadline())
                             expect(await token1Contract.balanceOf(alice.address)).to.be.equal(
                                 '0' // All the input tokens are spent
                             )
@@ -500,7 +506,7 @@ describe('test SDK', function () {
                         expect(quote[0]).to.be.equal('99999999999999999')
                         expect(quote[1]).to.be.equal('71477685486017676')
 
-                        await sdk.connect(alice).increaseLiquidity('1', MONE.div(10).toString(), MONE.div(10).toString(), '0', '0', new Date(Date.now() + 1000000))
+                        await sdk.connect(alice).increaseLiquidity('1', MONE.div(10).toString(), MONE.div(10).toString(), '0', '0', await chainDeadline())
 
                         // 999999999999999999 (~1 ETH) + 99999999999999999 (~0.1 ETH) = 1099999999999999998 (~1.1 ETH)
                         expect(await sdk.positionAmount0('1')).to.be.equal('1099999999999999998')
@@ -521,7 +527,7 @@ describe('test SDK', function () {
                         expect(quote[1]).to.be.equal('71477685486017676')
 
                         // Only Charlie & his operators can decrease liquidity
-                        await sdk.connect(charlie).decreaseLiquidity('1', liquidityReduction.toString(), '0', '0', new Date(Date.now() + 1000000))
+                        await sdk.connect(charlie).decreaseLiquidity('1', liquidityReduction.toString(), '0', '0', await chainDeadline())
 
                         // 999999999999999999 (~1 ETH) - 100000000000000000 (~0.1 ETH) = 899999999999999999 (~0.9 ETH)
                         expect(await sdk.positionAmount0('1')).to.be.equal('899999999999999999')
@@ -537,7 +543,7 @@ describe('test SDK', function () {
 
                         const liquidity = await sdk.positionLiquidity('1')
 
-                        await sdk.connect(charlie).decreaseLiquidity('1', liquidity.toString(), '0', '0', new Date(Date.now() + 1000000))
+                        await sdk.connect(charlie).decreaseLiquidity('1', liquidity.toString(), '0', '0', await chainDeadline())
 
                         await sdk.connect(charlie).collect('1', charlie.address, MONE.toString(), MONE.toString())
 
@@ -555,7 +561,7 @@ describe('test SDK', function () {
                     it('locks a position', async function() {
                         const currentEpoch = await time.latest()
                         const lockedUntil = new Date((currentEpoch + 1000) * 1000)
-                        await sdk.connect(charlie).lock('1', lockedUntil, new Date(Date.now() + 1000000))
+                        await sdk.connect(charlie).lock('1', lockedUntil, await chainDeadline())
                         expect(await sdk.positionIsLocked('1')).to.be.true
                         expect((await sdk.positionLockedUntil('1')).getTime()).to.be.equal(lockedUntil.getTime())
                     })
@@ -566,7 +572,7 @@ describe('test SDK', function () {
                         // Start with a swap
                         await token0Contract.connect(alice).mint(MONE.div(10))
                         await token0Contract.connect(alice).approve(routerContract.address, MONE.div(10))
-                        await sdk.connect(alice).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', bob.address, new Date(Date.now() + 1000000))
+                        await sdk.connect(alice).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', bob.address, await chainDeadline())
                         
                         console.log('Swapped.')
                         console.log('Pool address:', poolContract.address)
@@ -594,7 +600,7 @@ describe('test SDK', function () {
                         // Start with a swap
                         await token0Contract.connect(alice).mint(MONE.div(10))
                         await token0Contract.connect(alice).approve(routerContract.address, MONE.div(10))
-                        await sdk.connect(alice).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', bob.address, new Date(Date.now() + 1000000))
+                        await sdk.connect(alice).swapExactInput(TOKEN_0, TOKEN_1, MONE.div(10).toString(), '0', bob.address, await chainDeadline())
                         
                         console.log('Swapped.')
 
